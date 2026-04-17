@@ -1,0 +1,2840 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub MCP Server — Documentation</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0e17;
+        --surface: #0f1521;
+        --surface2: #151d2e;
+        --border: #1e2d45;
+        --accent: #3b82f6;
+        --accent2: #06b6d4;
+        --accent3: #8b5cf6;
+        --green: #10b981;
+        --orange: #f59e0b;
+        --red: #ef4444;
+        --pink: #ec4899;
+        --text: #e2e8f0;
+        --muted: #64748b;
+        --dim: #94a3b8;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        font-weight: 300;
+        line-height: 1.7;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 270px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        padding: 2rem 0;
+        overflow-y: auto;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar-logo {
+        padding: 0 1.5rem 2rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.5rem;
+      }
+      .sidebar-logo .logo-icon {
+        font-size: 1.8rem;
+        margin-bottom: 0.5rem;
+      }
+      .sidebar-logo h2 {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        color: var(--accent);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .sidebar-logo p {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.2rem;
+      }
+      .nav-section {
+        padding: 0 1rem 0.5rem;
+      }
+      .nav-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: var(--muted);
+        padding: 0.5rem 0.5rem 0.3rem;
+        display: block;
+      }
+      .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 6px;
+        text-decoration: none;
+        color: var(--dim);
+        font-size: 0.82rem;
+        transition: all 0.15s;
+        margin-bottom: 2px;
+      }
+      .nav-link:hover,
+      .nav-link.active {
+        background: rgba(59, 130, 246, 0.12);
+        color: var(--accent);
+      }
+      .nav-link .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
+      }
+      main {
+        margin-left: 270px;
+        padding: 3rem 4rem;
+        max-width: 1100px;
+        position: relative;
+        z-index: 1;
+      }
+      .hero {
+        padding: 4rem 0 3rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 4rem;
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        color: var(--accent);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 1.5rem;
+      }
+      .hero-badge::before {
+        content: "●";
+        font-size: 0.5rem;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .hero h1 {
+        font-family: "Fraunces", serif;
+        font-size: 3.8rem;
+        font-weight: 900;
+        line-height: 1.1;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #e2e8f0 30%, #3b82f6 70%, #06b6d4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .hero p {
+        font-size: 1.1rem;
+        color: var(--dim);
+        max-width: 600px;
+        margin-bottom: 2rem;
+      }
+      .hero-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+      .pill {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.72rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        border: 1px solid;
+      }
+      .pill-blue {
+        background: rgba(59, 130, 246, 0.08);
+        border-color: rgba(59, 130, 246, 0.3);
+        color: #93c5fd;
+      }
+      .pill-green {
+        background: rgba(16, 185, 129, 0.08);
+        border-color: rgba(16, 185, 129, 0.3);
+        color: #6ee7b7;
+      }
+      .pill-purple {
+        background: rgba(139, 92, 246, 0.08);
+        border-color: rgba(139, 92, 246, 0.3);
+        color: #c4b5fd;
+      }
+      .pill-orange {
+        background: rgba(245, 158, 11, 0.08);
+        border-color: rgba(245, 158, 11, 0.3);
+        color: #fcd34d;
+      }
+      section {
+        margin-bottom: 5rem;
+        scroll-margin-top: 2rem;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .section-number {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        color: var(--muted);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        flex-shrink: 0;
+      }
+      h2 {
+        font-family: "Fraunces", serif;
+        font-size: 1.9rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+      h3 {
+        font-family: "Fraunces", serif;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--text);
+        margin: 2rem 0 0.8rem;
+      }
+      p {
+        color: var(--dim);
+        margin-bottom: 1rem;
+      }
+      .code-block {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 1.5rem 0;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+      }
+      .code-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 1rem;
+        background: var(--surface2);
+        border-bottom: 1px solid var(--border);
+      }
+      .code-header .lang {
+        color: var(--muted);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .code-dots {
+        display: flex;
+        gap: 5px;
+      }
+      .code-dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .code-dots span:nth-child(1) {
+        background: #ff5f57;
+      }
+      .code-dots span:nth-child(2) {
+        background: #febc2e;
+      }
+      .code-dots span:nth-child(3) {
+        background: #28c840;
+      }
+      .code-body {
+        padding: 1.2rem 1.4rem;
+        overflow-x: auto;
+      }
+      .code-body pre {
+        color: #cbd5e1;
+        line-height: 1.8;
+      }
+      .kw {
+        color: #c792ea;
+      }
+      .fn {
+        color: #82aaff;
+      }
+      .st {
+        color: #c3e88d;
+      }
+      .cm {
+        color: #546e7a;
+        font-style: italic;
+      }
+      .nu {
+        color: #f78c6c;
+      }
+      .cl {
+        color: #ffcb6b;
+      }
+      .dt {
+        color: #89ddff;
+      }
+      .va {
+        color: #eeffff;
+      }
+      .callout {
+        display: flex;
+        gap: 1rem;
+        padding: 1.2rem 1.4rem;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+        border-left: 3px solid;
+      }
+      .callout-icon {
+        font-size: 1.2rem;
+        flex-shrink: 0;
+        margin-top: 0.1rem;
+      }
+      .callout-body {
+        flex: 1;
+      }
+      .callout-body strong {
+        display: block;
+        font-size: 0.85rem;
+        margin-bottom: 0.3rem;
+        font-weight: 500;
+      }
+      .callout-body p {
+        font-size: 0.85rem;
+        margin: 0;
+      }
+      .callout-blue {
+        background: rgba(59, 130, 246, 0.06);
+        border-color: var(--accent);
+      }
+      .callout-blue strong {
+        color: #93c5fd;
+      }
+      .callout-green {
+        background: rgba(16, 185, 129, 0.06);
+        border-color: var(--green);
+      }
+      .callout-green strong {
+        color: #6ee7b7;
+      }
+      .callout-orange {
+        background: rgba(245, 158, 11, 0.06);
+        border-color: var(--orange);
+      }
+      .callout-orange strong {
+        color: #fcd34d;
+      }
+      .callout-red {
+        background: rgba(239, 68, 68, 0.06);
+        border-color: var(--red);
+      }
+      .callout-red strong {
+        color: #fca5a5;
+      }
+      .callout-purple {
+        background: rgba(139, 92, 246, 0.06);
+        border-color: var(--accent3);
+      }
+      .callout-purple strong {
+        color: #c4b5fd;
+      }
+      .param-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.83rem;
+        margin: 1.5rem 0;
+      }
+      .param-table th {
+        background: var(--surface2);
+        color: var(--accent);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 0.7rem 1rem;
+        text-align: left;
+        border-bottom: 2px solid var(--border);
+        font-weight: 600;
+      }
+      .param-table td {
+        padding: 0.7rem 1rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .param-table tr:last-child td {
+        border-bottom: none;
+      }
+      .param-table tr:hover td {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .param-name {
+        font-family: "JetBrains Mono", monospace;
+        color: #c4b5fd;
+        font-size: 0.8rem;
+      }
+      .param-default {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--orange);
+        font-size: 0.78rem;
+      }
+      .param-desc {
+        color: var(--dim);
+        line-height: 1.5;
+      }
+      .param-req {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--red);
+        font-size: 0.72rem;
+      }
+      .param-opt {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--green);
+        font-size: 0.72rem;
+      }
+      .tool-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+      .tool-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1.4rem;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+        cursor: default;
+      }
+      .tool-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+      }
+      .tool-card-icon {
+        font-size: 1.6rem;
+        margin-bottom: 0.8rem;
+      }
+      .tool-card h4 {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        color: var(--accent);
+        margin-bottom: 0.4rem;
+        font-weight: 600;
+      }
+      .tool-card p {
+        font-size: 0.82rem;
+        color: var(--dim);
+        margin: 0;
+      }
+      .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 3px;
+        border: 1px solid;
+      }
+      .tag-blue {
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.3);
+        color: #93c5fd;
+      }
+      .tag-green {
+        background: rgba(16, 185, 129, 0.1);
+        border-color: rgba(16, 185, 129, 0.3);
+        color: #6ee7b7;
+      }
+      .tag-purple {
+        background: rgba(139, 92, 246, 0.1);
+        border-color: rgba(139, 92, 246, 0.3);
+        color: #c4b5fd;
+      }
+      .tag-orange {
+        background: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.3);
+        color: #fcd34d;
+      }
+      .returns-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1rem 1.2rem;
+        margin: 1rem 0;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.78rem;
+        color: #c3e88d;
+      }
+      .file-badge {
+        display: inline-block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.72rem;
+        background: rgba(139, 92, 246, 0.12);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        color: #c4b5fd;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+      }
+      .fn-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        margin: 1.2rem 0;
+      }
+      .fn-table th {
+        background: var(--surface2);
+        color: var(--accent2);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 0.6rem 0.9rem;
+        text-align: left;
+        border-bottom: 2px solid var(--border);
+      }
+      .fn-table td {
+        padding: 0.65rem 0.9rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .fn-table tr:last-child td {
+        border-bottom: none;
+      }
+      .fn-table tr:hover td {
+        background: rgba(255, 255, 255, 0.015);
+      }
+      .fn-name {
+        font-family: "JetBrains Mono", monospace;
+        color: #82aaff;
+        font-size: 0.8rem;
+      }
+      .fn-ret {
+        font-family: "JetBrains Mono", monospace;
+        color: #f78c6c;
+        font-size: 0.78rem;
+      }
+      .fn-desc {
+        color: var(--dim);
+      }
+      ul {
+        color: var(--dim);
+        margin-left: 1.5rem;
+        margin-bottom: 1rem;
+      }
+      li {
+        margin-bottom: 0.3rem;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .toc-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1.5rem 0;
+      }
+      .toc-link {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--dim);
+        text-decoration: none;
+        transition: all 0.15s;
+      }
+      .toc-link:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── Sidebar ── -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">⚡</div>
+        <h2>GitHub MCP</h2>
+        <p>v0.1.0 · 12 tools · RAG</p>
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">Getting Started</span>
+        <a class="nav-link" href="#overview"
+          ><span class="dot"></span>Overview</a
+        >
+        <a class="nav-link" href="#quickstart"
+          ><span class="dot"></span>Quick Start</a
+        >
+        <a class="nav-link" href="#setup"
+          ><span class="dot"></span>Setup &amp; Config</a
+        >
+        <a class="nav-link" href="#rag"
+          ><span class="dot"></span>RAG Pipeline</a
+        >
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">GitHub Tools (1–4)</span>
+        <a class="nav-link" href="#list-files"
+          ><span class="dot"></span>list_files</a
+        >
+        <a class="nav-link" href="#create-branch"
+          ><span class="dot"></span>create_branch</a
+        >
+        <a class="nav-link" href="#create-file"
+          ><span class="dot"></span>create_file</a
+        >
+        <a class="nav-link" href="#create-pr"
+          ><span class="dot"></span>create_pull_request</a
+        >
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">Projects v2 Tools (5–10)</span>
+        <a class="nav-link" href="#create-task"
+          ><span class="dot"></span>create_project_task</a
+        >
+        <a class="nav-link" href="#list-tasks"
+          ><span class="dot"></span>list_project_tasks</a
+        >
+        <a class="nav-link" href="#assign-task"
+          ><span class="dot"></span>assign_task</a
+        >
+        <a class="nav-link" href="#update-status"
+          ><span class="dot"></span>update_task_status</a
+        >
+        <a class="nav-link" href="#create-field"
+          ><span class="dot"></span>create_project_field</a
+        >
+        <a class="nav-link" href="#set-fields"
+          ><span class="dot"></span>set_task_fields</a
+        >
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">AI / RAG Tools (11–12)</span>
+        <a class="nav-link" href="#ask-codebase"
+          ><span class="dot"></span>ask_codebase</a
+        >
+        <a class="nav-link" href="#explore-codebase"
+          ><span class="dot"></span>explore_codebase</a
+        >
+      </div>
+
+      <div class="nav-section">
+        <span class="nav-label">Module Reference</span>
+        <a class="nav-link" href="#mod-server"
+          ><span class="dot"></span>server.py</a
+        >
+        <a class="nav-link" href="#mod-ingest"
+          ><span class="dot"></span>ingest.py</a
+        >
+        <a class="nav-link" href="#mod-rag-query"
+          ><span class="dot"></span>rag_query.py</a
+        >
+        <a class="nav-link" href="#mod-config"
+          ><span class="dot"></span>config.py</a
+        >
+        <a class="nav-link" href="#mod-constants"
+          ><span class="dot"></span>constants.py</a
+        >
+        <a class="nav-link" href="#mod-github-api"
+          ><span class="dot"></span>core/github_api.py</a
+        >
+        <a class="nav-link" href="#mod-helpers"
+          ><span class="dot"></span>utils/project_helpers.py</a
+        >
+      </div>
+    </nav>
+
+    <!-- ── Main ── -->
+    <main>
+      <!-- ── Hero ── -->
+      <div class="hero">
+        <div class="hero-badge">● Live Docs — March 2026</div>
+        <h1>GitHub MCP Server</h1>
+        <p>
+          12 MCP tools for GitHub repository management, Projects&nbsp;v2
+          boards, and AI-powered codebase Q&amp;A — built on FastMCP with a
+          ChromaDB + Groq RAG pipeline.
+        </p>
+        <div class="hero-pills">
+          <span class="pill pill-blue">12 MCP Tools</span>
+          <span class="pill pill-green">RAG / AI</span>
+          <span class="pill pill-purple">GitHub Projects v2</span>
+          <span class="pill pill-orange">FastMCP · SSE</span>
+          <span class="pill pill-blue">ChromaDB</span>
+          <span class="pill pill-green">Groq LLM</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
+     §0 OVERVIEW
+═══════════════════════════════════════════════════════ -->
+      <section id="overview">
+        <div class="section-header">
+          <span class="section-number">§0</span>
+          <h2>Overview</h2>
+        </div>
+
+        <p>
+          GitHub MCP Server is a modular FastMCP server that exposes
+          <strong>12 tools</strong> over an SSE endpoint. Tools 1–10 wrap the
+          GitHub REST and GraphQL APIs; Tools 11–12 power a RAG Q&amp;A pipeline
+          over the indexed codebase.
+        </p>
+
+        <div class="tool-grid">
+          <div class="tool-card">
+            <div class="tool-card-icon">📁</div>
+            <h4>list_files</h4>
+            <p>Browse repo directories and file trees</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">🌿</div>
+            <h4>create_branch</h4>
+            <p>Create a branch from any source ref</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">📝</div>
+            <h4>create_file</h4>
+            <p>Create or update a file with a commit</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">🔀</div>
+            <h4>create_pull_request</h4>
+            <p>Open a PR (supports draft)</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">✅</div>
+            <h4>create_project_task</h4>
+            <p>Create Issue or draft card on a v2 board</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">📋</div>
+            <h4>list_project_tasks</h4>
+            <p>Paginated board item listing with custom fields</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">👤</div>
+            <h4>assign_task</h4>
+            <p>Assign users + labels (auto-creates labels)</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">🔄</div>
+            <h4>update_task_status</h4>
+            <p>Move item between Status columns</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">🗂️</div>
+            <h4>create_project_field</h4>
+            <p>Add text/number/date field to a board</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">✏️</div>
+            <h4>set_task_fields</h4>
+            <p>Set multiple custom field values at once</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">🧠</div>
+            <h4>ask_codebase</h4>
+            <p>RAG Q&amp;A — answers questions with source citations</p>
+          </div>
+          <div class="tool-card">
+            <div class="tool-card-icon">🔍</div>
+            <h4>explore_codebase</h4>
+            <p>Find files, list images, read file contents</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════
+     §1 QUICK START
+═══════════════════════════════════════════════════════ -->
+      <section id="quickstart">
+        <div class="section-header">
+          <span class="section-number">§1</span>
+          <h2>Quick Start</h2>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="cm"># 1. Clone and install</span>
+git clone &lt;your-repo-url&gt;
+cd GitHubMCP
+
+curl -LsSf https://astral.sh/uv/install.sh | sh   <span class="cm"># install uv</span>
+uv venv &amp;&amp; source .venv/bin/activate
+uv pip install -e .
+
+<span class="cm"># 2. Configure</span>
+cp .env.example .env   <span class="cm"># fill in GITHUB_TOKEN, GROQ_API_KEY, POSTGRES_URL …</span>
+
+<span class="cm"># 3. Start PGVector (default vector store)</span>
+docker run -d --name pgvector \
+  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=rag_db -p 5432:5432 pgvector/pgvector:pg16
+
+<span class="cm"># 4. Index the target repo into PGVector</span>
+python ingest.py
+
+<span class="cm"># 5. (Optional) verify RAG chain</span>
+python rag_query.py "Tell me about this project"
+
+<span class="cm"># 6. Start the MCP server</span>
+python server.py --port 8090</pre>
+          </div>
+        </div>
+
+        <p>
+          The server starts on
+          <code style="font-family: monospace; color: #93c5fd"
+            >http://localhost:8090/sse</code
+          >.
+        </p>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════
+     §2 SETUP & CONFIG
+═══════════════════════════════════════════════════════ -->
+      <section id="setup">
+        <div class="section-header">
+          <span class="section-number">§2</span>
+          <h2>Setup &amp; Configuration</h2>
+        </div>
+
+        <h3>Environment Variables</h3>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">.env</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="cm"># ── Required ──────────────────────────────────────</span>
+<span class="va">GITHUB_TOKEN</span>=ghp_...          <span class="cm"># GitHub PAT (repo + project scopes)</span>
+<span class="va">GITHUB_OWNER</span>=Bishwajit-2810   <span class="cm"># GitHub username or org</span>
+<span class="va">GITHUB_REPO</span>=The_New_York_Times
+<span class="va">PROJECT_ID</span>=2                  <span class="cm"># Projects v2 board number from URL</span>
+
+<span class="cm"># ── AI / RAG ──────────────────────────────────────</span>
+<span class="va">GROQ_API_KEY</span>=gsk_...          <span class="cm"># Free at console.groq.com</span>
+<span class="va">RAG_VECTOR_DB</span>=pgvector        <span class="cm"># chroma | pgvector | both  (default: pgvector)</span>
+<span class="va">RAG_SKIP_LOCAL_DOCS</span>=true      <span class="cm"># true = only index the target GitHub repo</span>
+
+<span class="cm"># ── PGVector (default store) ──────────────────────</span>
+<span class="va">POSTGRES_URL</span>=postgresql://postgres:postgres@localhost:5432/rag_db
+
+<span class="cm"># ── ChromaDB (fallback) ───────────────────────────</span>
+<span class="va">RAG_CHROMA_DIR</span>=./chroma_store</pre>
+          </div>
+        </div>
+
+        <h3>GitHub Token Scopes</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Scope</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-desc">
+                Read/write files, branches, pull requests
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">project</td>
+              <td class="param-desc">GitHub Projects v2 access</td>
+            </tr>
+            <tr>
+              <td class="param-name">read:org</td>
+              <td class="param-desc">Required when owner is an organisation</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Optional: PGVector</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>
+docker run -d \
+  --name pgvector \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=rag_db \
+  -p 5432:5432 \
+  pgvector/pgvector:pg16</pre
+            >
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════
+     §3 RAG PIPELINE
+═══════════════════════════════════════════════════════ -->
+      <section id="rag">
+        <div class="section-header">
+          <span class="section-number">§3</span>
+          <h2>RAG Pipeline</h2>
+        </div>
+
+        <p>
+          The RAG pipeline fetches every file from the target GitHub repository
+          (<code style="font-family: monospace; color: #93c5fd"
+            >GITHUB_OWNER/GITHUB_REPO</code
+          >), embeds text chunks with
+          <code style="font-family: monospace">all-MiniLM-L6-v2</code>, and
+          stores them in <strong>PGVector</strong> (default) or ChromaDB. The
+          <code style="font-family: monospace; color: #82aaff"
+            >ask_codebase</code
+          >
+          and
+          <code style="font-family: monospace; color: #82aaff"
+            >explore_codebase</code
+          >
+          tools query this store at runtime.
+        </p>
+
+        <div class="callout callout-blue">
+          <div class="callout-icon">ℹ️</div>
+          <div class="callout-body">
+            <strong>Vector store selection</strong>
+            <p>
+              Set <code style="font-family: monospace">RAG_VECTOR_DB</code> in
+              <code style="font-family: monospace">.env</code>:
+              <code style="font-family: monospace">pgvector</code> (default) |
+              <code style="font-family: monospace">chroma</code> |
+              <code style="font-family: monospace">both</code>. Change it any
+              time and restart the server — no re-indexing needed.
+            </p>
+          </div>
+        </div>
+
+        <h3>Step 1 — Install RAG dependencies</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>
+uv add langchain langchain-community langchain-chroma langchain-huggingface \
+       langchain-groq langchain-text-splitters langchain-postgres \
+       chromadb sentence-transformers pgvector psycopg2-binary</pre
+            >
+          </div>
+        </div>
+
+        <h3>Step 2 — Index the repo (run once)</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>python ingest.py                 <span class="cm"># full index → PGVector (default)</span>
+python ingest.py --reingest      <span class="cm"># wipe &amp; re-index</span>
+python ingest.py --db chroma     <span class="cm"># ChromaDB only</span>
+python ingest.py --db both       <span class="cm"># both stores</span>
+python ingest.py --docs-only     <span class="cm"># local docs only (fast, no GitHub call)</span></pre>
+          </div>
+        </div>
+
+        <h3>What gets indexed</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>File Type</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">
+                .py .md .js .ts .json .toml .yaml .html .css .sh .sql
+              </td>
+              <td class="param-desc">
+                Split into 500-char chunks and embedded via
+                <code style="font-family: monospace"
+                  >sentence-transformers/all-MiniLM-L6-v2</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">
+                .png .jpg .gif .svg .ico .webp .pdf .zip
+              </td>
+              <td class="param-desc">
+                Stored as metadata stubs — not embedded, but visible to
+                <code style="font-family: monospace">explore_codebase</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout callout-orange">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body">
+            <strong>RAG_SKIP_LOCAL_DOCS</strong>
+            <p>
+              Set
+              <code style="font-family: monospace"
+                >RAG_SKIP_LOCAL_DOCS=true</code
+              >
+              in <code style="font-family: monospace">.env</code> (recommended)
+              to prevent the MCP project's own
+              <code style="font-family: monospace">README.md</code>,
+              <code style="font-family: monospace">plan.md</code>, and
+              <code style="font-family: monospace">docs.html</code> from being
+              mixed in with the target repo's data.
+            </p>
+          </div>
+        </div>
+
+        <h3>Expected Output</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">log</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>
+INFO  Default branch: 'master'
+INFO  Total files in repo: 42
+INFO  Text files loaded : 28
+INFO  Binary files found: 14
+INFO  Split into 312 chunks
+INFO  PGVector: collection 'github_mcp_docs' stored ✅
+INFO  Indexed 312 text chunks from 28 text files
+INFO  Images found (8): ['logo.png', 'banner.jpg', ...]</pre
+            >
+          </div>
+        </div>
+
+        <h3>Step 3 — Test the RAG chain</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>python rag_query.py                                   <span class="cm"># 3 built-in questions</span>
+python rag_query.py "Tell me about this project"      <span class="cm"># custom question</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════
+     TOOL SECTIONS
+═══════════════════════════════════════════════════════ -->
+
+      <!-- Tool 1: list_files -->
+      <section id="list-files">
+        <div class="section-header">
+          <span class="section-number">Tool 1</span>
+          <h2>list_files</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/files.py</div>
+        <p>
+          Browse files and directories inside a GitHub repository at any path,
+          branch, tag, or SHA.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">async def</span> <span class="fn">list_files</span>(
+    path:  <span class="cl">str</span> = <span class="st">""</span>,
+    ref:   <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+    owner: <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+    repo:  <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+) -&gt; <span class="cl">dict</span>:
+    <span class="st">"""List files and directories inside a GitHub repository path.
+
+    Args:
+        path:  Path inside the repo (default = root "").
+        ref:   Branch / tag / SHA to read from (default = default branch).
+        owner: Repo owner (defaults to GITHUB_OWNER in .env).
+        repo:  Repository name (defaults to GITHUB_REPO in .env).
+    """</span></pre>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">path</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">""</td>
+              <td class="param-desc">Path inside the repo (empty = root)</td>
+            </tr>
+            <tr>
+              <td class="param-name">ref</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">default branch</td>
+              <td class="param-desc">Branch / tag / SHA to read from</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Repo owner</td>
+            </tr>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_REPO</td>
+              <td class="param-desc">Repository name</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { repo, path, count, items: [{name, type, size, sha, html_url,
+          download_url}] }
+        </div>
+      </section>
+
+      <!-- Tool 2: create_branch -->
+      <section id="create-branch">
+        <div class="section-header">
+          <span class="section-number">Tool 2</span>
+          <h2>create_branch</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/branches.py</div>
+        <p>
+          Create a new branch from an existing branch in a GitHub repository.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">async def</span> <span class="fn">create_branch</span>(
+    branch:        <span class="cl">str</span>,
+    source_branch: <span class="cl">str</span> = <span class="st">"main"</span>,
+    owner:         <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+    repo:          <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+) -&gt; <span class="cl">dict</span>:
+    <span class="st">"""Create a new branch from an existing branch.
+
+    Args:
+        branch:        Name of the new branch.
+        source_branch: Branch to copy from (default "main").
+        owner:         Repo owner (defaults to GITHUB_OWNER in .env).
+        repo:          Repository name (defaults to GITHUB_REPO in .env).
+    """</span></pre>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">branch</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">Name of the new branch</td>
+            </tr>
+            <tr>
+              <td class="param-name">source_branch</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">"main"</td>
+              <td class="param-desc">Branch to copy from</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Repo owner</td>
+            </tr>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_REPO</td>
+              <td class="param-desc">Repository name</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">{ repo, branch, source, sha, ref, url }</div>
+      </section>
+
+      <!-- Tool 3: create_file -->
+      <section id="create-file">
+        <div class="section-header">
+          <span class="section-number">Tool 3</span>
+          <h2>create_file</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/file_operations.py</div>
+        <p>
+          Create or update a file in a GitHub repository with an automatic Git
+          commit. If the file already exists, it is updated (fetches current SHA
+          automatically).
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">async def</span> <span class="fn">create_file</span>(
+    file_path:      <span class="cl">str</span>,
+    content:        <span class="cl">str</span>,
+    commit_message: <span class="cl">str</span>,
+    branch:         <span class="cl">str</span> = <span class="st">"main"</span>,
+    owner:          <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+    repo:           <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+) -&gt; <span class="cl">dict</span>:
+    <span class="st">"""Create or update a file in a GitHub repository.
+
+    Args:
+        file_path:      Path inside the repo e.g. "src/hello.py".
+        content:        Plain-text content for the file.
+        commit_message: Git commit message.
+        branch:         Target branch (default "main").
+        owner:          Repo owner (defaults to GITHUB_OWNER in .env).
+        repo:           Repository name (defaults to GITHUB_REPO in .env).
+    """</span></pre>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">file_path</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                Path inside the repo, e.g.
+                <code style="font-family: monospace">src/hello.py</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">content</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">Plain-text file content</td>
+            </tr>
+            <tr>
+              <td class="param-name">commit_message</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">Git commit message</td>
+            </tr>
+            <tr>
+              <td class="param-name">branch</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">"main"</td>
+              <td class="param-desc">Target branch</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Repo owner</td>
+            </tr>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_REPO</td>
+              <td class="param-desc">Repository name</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { repo, action, file_path, branch, commit_sha, commit_url, blob_url }
+        </div>
+      </section>
+
+      <!-- Tool 4: create_pull_request -->
+      <section id="create-pr">
+        <div class="section-header">
+          <span class="section-number">Tool 4</span>
+          <h2>create_pull_request</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/pull_requests.py</div>
+        <p>
+          Open a pull request on GitHub. Supports draft PRs and Markdown in the
+          body.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">async def</span> <span class="fn">create_pull_request</span>(
+    title: <span class="cl">str</span>,
+    head:  <span class="cl">str</span>,
+    base:  <span class="cl">str</span>  = <span class="st">"main"</span>,
+    body:  <span class="cl">str</span>  = <span class="st">""</span>,
+    draft: <span class="cl">bool</span> = <span class="kw">False</span>,
+    owner: <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+    repo:  <span class="cl">Optional</span>[<span class="cl">str</span>] = <span class="kw">None</span>,
+) -&gt; <span class="cl">dict</span>:
+    <span class="st">"""Open a pull request on GitHub.
+
+    Args:
+        title:  PR title.
+        head:   Source branch (the one with your changes).
+        base:   Target branch to merge into (default "main").
+        body:   PR description (Markdown supported).
+        draft:  Open as a draft PR (default False).
+        owner:  Repo owner (defaults to GITHUB_OWNER in .env).
+        repo:   Repository name (defaults to GITHUB_REPO in .env).
+    """</span></pre>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">title</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">PR title</td>
+            </tr>
+            <tr>
+              <td class="param-name">head</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">Source branch with your changes</td>
+            </tr>
+            <tr>
+              <td class="param-name">base</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">"main"</td>
+              <td class="param-desc">Target branch to merge into</td>
+            </tr>
+            <tr>
+              <td class="param-name">body</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">""</td>
+              <td class="param-desc">PR description (Markdown supported)</td>
+            </tr>
+            <tr>
+              <td class="param-name">draft</td>
+              <td class="param-opt">bool</td>
+              <td class="param-default">False</td>
+              <td class="param-desc">Open as a draft PR</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Repo owner</td>
+            </tr>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_REPO</td>
+              <td class="param-desc">Repository name</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { repo, number, title, state, draft, html_url, head, base, created_at
+          }
+        </div>
+      </section>
+
+      <!-- Tool 5: create_project_task -->
+      <section id="create-task">
+        <div class="section-header">
+          <span class="section-number">Tool 5</span>
+          <h2>create_project_task</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/tasks.py</div>
+        <p>
+          Create a task and add it to a GitHub Projects v2 board. If
+          <code style="font-family: monospace">repo</code> is supplied, a real
+          Issue is created and linked to the project; otherwise a draft card is
+          added directly to the board. The Status column can be set in the same
+          call.
+        </p>
+        <div class="callout callout-blue">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body">
+            <strong>Real Issue vs Draft</strong>
+            <p>
+              Pass <code style="font-family: monospace">repo</code> to create a
+              full GitHub Issue (with URL, number, assignees, labels). Omit to
+              create a lightweight board-only draft card.
+            </p>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">title</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">Task title</td>
+            </tr>
+            <tr>
+              <td class="param-name">body</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">""</td>
+              <td class="param-desc">Description (Markdown supported)</td>
+            </tr>
+            <tr>
+              <td class="param-name">status</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">None</td>
+              <td class="param-desc">
+                Status column name, e.g.
+                <code style="font-family: monospace">"Todo"</code>,
+                <code style="font-family: monospace">"In Progress"</code>,
+                <code style="font-family: monospace">"Done"</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">project_number</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">PROJECT_ID</td>
+              <td class="param-desc">Project number from the board URL</td>
+            </tr>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_REPO</td>
+              <td class="param-desc">
+                Repo name — if given, creates a real Issue
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Repo / project owner</td>
+            </tr>
+            <tr>
+              <td class="param-name">assignee</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">None</td>
+              <td class="param-desc">GitHub username to assign</td>
+            </tr>
+            <tr>
+              <td class="param-name">label</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">None</td>
+              <td class="param-desc">Label name (auto-created if missing)</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { project_title, project_id, item_id, title, status, type, issue_url?,
+          issue_number? }
+        </div>
+      </section>
+
+      <!-- Tool 6: list_project_tasks -->
+      <section id="list-tasks">
+        <div class="section-header">
+          <span class="section-number">Tool 6</span>
+          <h2>list_project_tasks</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/task_list.py</div>
+        <p>
+          List items on a GitHub Projects v2 board with flexible offset
+          pagination. Supports any range — e.g.
+          <code style="font-family: monospace">offset=200, limit=150</code>
+          returns items 200–349. Returns per-item: title, type, status, all
+          custom fields, assignees, labels, issue number, state, URL.
+        </p>
+        <div class="callout callout-orange">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body">
+            <strong
+              >Always call this first before update_task_status or
+              set_task_fields</strong
+            >
+            <p>
+              Copy the
+              <code style="font-family: monospace">item_id</code> (starts with
+              <code style="font-family: monospace">PVTI_</code>) and
+              <code style="font-family: monospace">custom_field_names</code>
+              from the response to use in subsequent calls.
+            </p>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">project_number</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">PROJECT_ID</td>
+              <td class="param-desc">Project board number</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">
+                Project owner — user or org (auto-detected)
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">offset</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">0</td>
+              <td class="param-desc">
+                0-based index of the first item to return
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">limit</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">50</td>
+              <td class="param-desc">Number of items to return</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { project_title, project_id, total_count, offset, limit, items: [...],
+          custom_field_names }
+        </div>
+      </section>
+
+      <!-- Tool 7: assign_task -->
+      <section id="assign-task">
+        <div class="section-header">
+          <span class="section-number">Tool 7</span>
+          <h2>assign_task</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/task_assign.py</div>
+        <p>
+          Assign users and labels to a GitHub Issue. Labels not present in the
+          repo are automatically created with a random colour. Existing
+          assignees are replaced; labels are merged with existing ones.
+        </p>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">issue_number</td>
+              <td class="param-req">int*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">Issue number from the URL</td>
+            </tr>
+            <tr>
+              <td class="param-name">assignees</td>
+              <td class="param-req">list[str]*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                GitHub usernames — pass
+                <code style="font-family: monospace">[]</code> to clear
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">labels</td>
+              <td class="param-opt">list[str]</td>
+              <td class="param-default">None</td>
+              <td class="param-desc">Labels to apply (merged with existing)</td>
+            </tr>
+            <tr>
+              <td class="param-name">repo</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_REPO</td>
+              <td class="param-desc">Repository name</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Repo owner</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { repo, issue_number, title, state, html_url, assignees, labels,
+          updated_at }
+        </div>
+      </section>
+
+      <!-- Tool 8: update_task_status -->
+      <section id="update-status">
+        <div class="section-header">
+          <span class="section-number">Tool 8</span>
+          <h2>update_task_status</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/task_status.py</div>
+        <p>
+          Change the Status column of any existing item on a Projects v2 board.
+          The <code style="font-family: monospace">item_id</code> must come from
+          <code style="font-family: monospace">list_project_tasks</code> — it
+          starts with <code style="font-family: monospace">PVTI_</code> and is
+          stable regardless of item order.
+        </p>
+        <div class="callout callout-red">
+          <div class="callout-icon">🔒</div>
+          <div class="callout-body">
+            <strong>item_id is mandatory</strong>
+            <p>
+              Never guess or assume an
+              <code style="font-family: monospace">item_id</code>. Always call
+              <code style="font-family: monospace">list_project_tasks</code>
+              first and copy the exact value from the response.
+            </p>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">item_id</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                From
+                <code style="font-family: monospace">list_project_tasks</code> —
+                starts with <code style="font-family: monospace">PVTI_</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">status</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                New status column name (case-insensitive)
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">project_number</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">PROJECT_ID</td>
+              <td class="param-desc">Project number</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Project owner</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">{ item_id, status_updated, project_id }</div>
+      </section>
+
+      <!-- Tool 9: create_project_field -->
+      <section id="create-field">
+        <div class="section-header">
+          <span class="section-number">Tool 9</span>
+          <h2>create_project_field</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/project_fields.py</div>
+        <p>
+          Add a custom text, number, or date field to a GitHub Projects v2
+          board. Idempotent — if a field with the same name already exists it is
+          returned without error.
+        </p>
+        <h3>Supported Field Types</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Use for</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">text</td>
+              <td class="param-desc">
+                Free-form text notes, links, descriptions
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">number</td>
+              <td class="param-desc">
+                Story points, effort hours, priority scores
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">date</td>
+              <td class="param-desc">
+                Start Date, End Date, Due Date, Deadline
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">field_name</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                Display name, e.g.
+                <code style="font-family: monospace">"Story Points"</code>,
+                <code style="font-family: monospace">"Due Date"</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">field_type</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                One of <code style="font-family: monospace">text</code>,
+                <code style="font-family: monospace">number</code>,
+                <code style="font-family: monospace">date</code>
+                (case-insensitive)
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">project_number</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">PROJECT_ID</td>
+              <td class="param-desc">Project number</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Project owner</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { project_id, field_id, field_name, field_type, already_existed }
+        </div>
+      </section>
+
+      <!-- Tool 10: set_task_fields -->
+      <section id="set-fields">
+        <div class="section-header">
+          <span class="section-number">Tool 10</span>
+          <h2>set_task_fields</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/task_fields.py</div>
+        <p>
+          Set one or more custom field values on a project item in a single
+          call. All field names are validated before any mutation is sent — if
+          any name is wrong, the full list of valid names is returned and
+          nothing is updated.
+        </p>
+        <div class="callout callout-blue">
+          <div class="callout-icon">📋</div>
+          <div class="callout-body">
+            <strong>Recommended workflow</strong>
+            <p>
+              1. Call
+              <code style="font-family: monospace">list_project_tasks</code> →
+              copy <code style="font-family: monospace">item_id</code> and
+              <code style="font-family: monospace">custom_field_names</code
+              ><br />2. Call
+              <code style="font-family: monospace">set_task_fields</code> with
+              those exact values
+            </p>
+          </div>
+        </div>
+        <h3>Value Formats</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Field type</th>
+              <th>Value format</th>
+              <th>Example</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">date</td>
+              <td class="param-desc">
+                <code style="font-family: monospace">"YYYY-MM-DD"</code> string
+              </td>
+              <td class="param-default">"2026-03-15"</td>
+            </tr>
+            <tr>
+              <td class="param-name">number</td>
+              <td class="param-desc">int or float</td>
+              <td class="param-default">8</td>
+            </tr>
+            <tr>
+              <td class="param-name">text</td>
+              <td class="param-desc">any string</td>
+              <td class="param-default">"Blocked by auth"</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">item_id</td>
+              <td class="param-req">str*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                From
+                <code style="font-family: monospace">list_project_tasks</code> —
+                starts with <code style="font-family: monospace">PVTI_</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">fields</td>
+              <td class="param-req">dict*</td>
+              <td class="param-default">—</td>
+              <td class="param-desc">
+                <code style="font-family: monospace"
+                  >{ field_name: value }</code
+                >
+                — names must match project exactly
+              </td>
+            </tr>
+            <tr>
+              <td class="param-name">project_number</td>
+              <td class="param-opt">int</td>
+              <td class="param-default">PROJECT_ID</td>
+              <td class="param-desc">Project number</td>
+            </tr>
+            <tr>
+              <td class="param-name">owner</td>
+              <td class="param-opt">str</td>
+              <td class="param-default">GITHUB_OWNER</td>
+              <td class="param-desc">Project owner</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — example</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="fn">set_task_fields</span>(
+    item_id=<span class="st">"PVTI_lADOBqfXXs4AbcDE"</span>,
+    fields={
+        <span class="st">"Start Date"</span>:   <span class="st">"2026-03-01"</span>,
+        <span class="st">"End Date"</span>:     <span class="st">"2026-03-31"</span>,
+        <span class="st">"Story Points"</span>: <span class="nu">8</span>,
+    }
+)</pre>
+          </div>
+        </div>
+        <h3>Returns</h3>
+        <div class="returns-box">
+          { item_id, project_id, fields_set, available_field_names }
+        </div>
+      </section>
+
+      <!-- Tool 11: ask_codebase -->
+      <section id="ask-codebase">
+        <div class="section-header">
+          <span class="section-number">Tool 11</span>
+          <h2>ask_codebase</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/rag_query.py</div>
+        <p>
+          Ask a natural-language question about the indexed GitHub repository.
+          Uses a RAG pipeline (PGVector/ChromaDB retriever + Groq
+          <code style="font-family: monospace">openai/gpt-oss-120b</code>) to
+          retrieve relevant code chunks and return a grounded answer with
+          source-file citations. The target repository is set by
+          <code style="font-family: monospace">GITHUB_OWNER</code> and
+          <code style="font-family: monospace">GITHUB_REPO</code> in
+          <code style="font-family: monospace">.env</code>.
+        </p>
+        <div class="callout callout-purple">
+          <div class="callout-icon">🧠</div>
+          <div class="callout-body">
+            <strong>Prerequisite</strong>
+            <p>
+              Run
+              <code style="font-family: monospace">python ingest.py</code> first
+              to populate the vector store. Set
+              <code style="font-family: monospace">GROQ_API_KEY</code> and
+              <code style="font-family: monospace">POSTGRES_URL</code> (or
+              <code style="font-family: monospace">RAG_CHROMA_DIR</code>) in
+              your <code style="font-family: monospace">.env</code>.
+            </p>
+          </div>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">async def</span> <span class="fn">ask_codebase</span>(question: <span class="cl">str</span>) -&gt; <span class="cl">dict</span>:
+    <span class="st">"""Ask a natural-language question about the indexed GitHub repository.
+
+    Uses a RAG pipeline (PGVector/ChromaDB + Groq openai/gpt-oss-120b) to
+    retrieve relevant code chunks and return a grounded answer with source
+    file citations.  The target repository is set by GITHUB_OWNER and
+    GITHUB_REPO in .env.
+
+    Run ingest.py first to index the repository into the vector store.
+
+    Args:
+        question: Any question about the repository, e.g.:
+                  "Tell me about this project."
+                  "What does the authentication module do?"
+                  "How is the database schema structured?"
+
+    Returns:
+        answer:   Grounded answer with [filename] citations.
+        question: The original question echoed back.
+        model:    LLM model used.
+        sources:  Deduplicated list of retrieved source filenames.
+    """</span></pre>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">question</td>
+              <td class="param-req">str*</td>
+              <td class="param-desc">
+                Any natural-language question about the indexed repository
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Example Questions</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="fn">ask_codebase</span>(<span class="st">"Tell me about this project"</span>)
+<span class="fn">ask_codebase</span>(<span class="st">"What does the authentication module do?"</span>)
+<span class="fn">ask_codebase</span>(<span class="st">"How is the main page structured?"</span>)
+<span class="fn">ask_codebase</span>(<span class="st">"What environment variables are used?"</span>)</pre>
+          </div>
+        </div>
+        <h3>Returns</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">json</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>{
+  <span class="st">"answer"</span>:   <span class="st">"To add a new tool, define an async function and decorate it with @mcp.tool() [server.py]..."</span>,
+  <span class="st">"question"</span>: <span class="st">"How do I add a new MCP tool?"</span>,
+  <span class="st">"model"</span>:    <span class="st">"openai/gpt-oss-120b"</span>,
+  <span class="st">"sources"</span>:  [<span class="st">"rag_query.py"</span>, <span class="st">"server.py"</span>]
+}</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tool 12: explore_codebase -->
+      <section id="explore-codebase">
+        <div class="section-header">
+          <span class="section-number">Tool 12</span>
+          <h2>explore_codebase</h2>
+        </div>
+        <div class="file-badge">github_mcp/tools/rag_query.py</div>
+        <p>
+          Explore the repository structure — find files, list images, read file
+          contents, count files by type. Unlike
+          <code style="font-family: monospace">ask_codebase</code> (which
+          answers logic/behaviour questions), this tool answers structural
+          queries.
+        </p>
+        <div class="callout callout-purple">
+          <div class="callout-icon">🔍</div>
+          <div class="callout-body">
+            <strong>Prerequisite</strong>
+            <p>
+              Run
+              <code style="font-family: monospace">python ingest.py</code> first
+              to build the ChromaDB index (including binary/image stubs).
+            </p>
+          </div>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">async def</span> <span class="fn">explore_codebase</span>(query: <span class="cl">str</span>) -&gt; <span class="cl">dict</span>:
+    <span class="st">"""Explore the repository — find files, list images, read file contents.
+
+    Unlike ask_codebase (which answers logic/behaviour questions),
+    this tool answers structural and file-level queries.
+
+    Examples:
+      "Are there any image files? How many and list them"
+      "How many Python files are there?"
+      "Show me the contents of index.html"
+      "What files are in the images folder?"
+      "List all files in the build folder"
+      "Find all .svg files"
+      "What file types exist in this repo?"
+      "Show me README.md"
+
+    Args:
+        query: A structural or file-level question about the repo.
+
+    Returns:
+        answer:        LLM answer with file listings or code blocks.
+        matched_files: Files directly matched by this query.
+        file_summary:  { extension: count } for the whole repo.
+        total_files:   Total unique files indexed.
+        images:        All image files found (name + folder + url).
+        query:         The original query echoed back.
+    """</span></pre>
+          </div>
+        </div>
+        <h3>Parameters</h3>
+        <table class="param-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th>Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="param-name">query</td>
+              <td class="param-req">str*</td>
+              <td class="param-desc">
+                A structural or file-level question about the repo
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Example Queries</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="fn">explore_codebase</span>(<span class="st">"Are there any image files?"</span>)
+<span class="fn">explore_codebase</span>(<span class="st">"How many Python files are there?"</span>)
+<span class="fn">explore_codebase</span>(<span class="st">"Show me the contents of server.py"</span>)
+<span class="fn">explore_codebase</span>(<span class="st">"List all .md files"</span>)
+<span class="fn">explore_codebase</span>(<span class="st">"What files are in the tools folder?"</span>)
+<span class="fn">explore_codebase</span>(<span class="st">"Find all files with 'config' in the name"</span>)
+<span class="fn">explore_codebase</span>(<span class="st">"What file types exist in this repo?"</span>)</pre>
+          </div>
+        </div>
+        <h3>Returns</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">json</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>{
+  <span class="st">"answer"</span>:        <span class="st">"There are 8 image files: logo.png, banner.jpg..."</span>,
+  <span class="st">"matched_files"</span>: [<span class="st">"logo.png"</span>, <span class="st">"banner.jpg"</span>],
+  <span class="st">"file_summary"</span>:  { <span class="st">".py"</span>: <span class="nu">12</span>, <span class="st">".md"</span>: <span class="nu">3</span>, <span class="st">".png"</span>: <span class="nu">5</span>, <span class="st">".jpg"</span>: <span class="nu">3</span> },
+  <span class="st">"total_files"</span>:   <span class="nu">42</span>,
+  <span class="st">"images"</span>: [
+    { <span class="st">"filename"</span>: <span class="st">"logo.png"</span>, <span class="st">"folder"</span>: <span class="st">"assets"</span>, <span class="st">"url"</span>: <span class="st">"https://..."</span> }
+  ],
+  <span class="st">"query"</span>: <span class="st">"Are there any image files?"</span>
+}</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════
+     MODULE REFERENCE
+═══════════════════════════════════════════════════════ -->
+
+      <!-- server.py -->
+      <section id="mod-server">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>server.py</h2>
+        </div>
+        <div class="file-badge">server.py</div>
+        <p>
+          Main entry point. Initialises
+          <code style="font-family: monospace">FastMCP("github-mcp")</code>,
+          calls
+          <code style="font-family: monospace">register_all_tools(mcp)</code> to
+          wire all 12 tools, and starts the SSE server.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — file docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="st">"""GitHub MCP Server — Main Entry Point.
+
+A modular GitHub API MCP server built on FastMCP.  Registers 12 tools
+that cover repository management, GitHub Projects v2 board operations,
+and AI-powered RAG Q&amp;A over an indexed GitHub repository.
+
+Tools:
+  1.  list_files          — browse repo directory contents
+  2.  create_branch       — create a branch from a source ref
+  3.  create_file         — create or update a file with a commit
+  4.  create_pull_request — open a PR (supports draft)
+  5.  create_project_task — create issue/draft on Projects v2 board
+  6.  list_project_tasks  — list board items with offset pagination
+  7.  assign_task         — assign users + labels to an issue
+  8.  update_task_status  — change Status column on the board
+  9.  create_project_field— add text/number/date field to a project
+  10. set_task_fields     — set custom field values on a board item
+  11. ask_codebase        — RAG Q&amp;A over the indexed repo (Groq + PGVector)
+  12. explore_codebase    — file-level explorer backed by the vector store
+"""</span></pre>
+          </div>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash — cli</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>python server.py [--port PORT] [--host HOST]</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ingest.py -->
+      <section id="mod-ingest">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>ingest.py</h2>
+        </div>
+        <div class="file-badge">ingest.py</div>
+        <p>
+          Fetches every file from the target GitHub repository (<code
+            style="font-family: monospace; color: #93c5fd"
+            >GITHUB_OWNER/GITHUB_REPO</code
+          >), embeds text chunks, and loads them into PGVector (default) and/or
+          ChromaDB. Run once before using the RAG tools; re-run after repo
+          changes with <code style="font-family: monospace">--reingest</code>.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — file docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="st">"""RAG Ingestion Script — indexes a GitHub repository into a vector store.
+
+Loads TWO sources into the chosen vector store (PGVector by default):
+
+  1. GitHub Repo  (controlled by GITHUB_OWNER / GITHUB_REPO in .env)
+     - Text files (.py .md .js .ts .json .toml .yaml .html .css .sh .sql .txt)
+       → split into 500-char chunks and embedded via HuggingFace MiniLM-L6-v2
+     - Binary/image files (.png .jpg .gif .svg .webp .ico .bmp .pdf .zip)
+       → stored as metadata stubs so explore_codebase can list them
+
+  2. Local docs files  (skipped when RAG_SKIP_LOCAL_DOCS=true)
+     - Any .html .md .txt file found in the project root
+
+Usage:
+    python ingest.py               # full index → PGVector (default)
+    python ingest.py --reingest    # wipe store first, then re-index
+    python ingest.py --db both     # PGVector + ChromaDB
+    python ingest.py --docs-only   # local docs only (fast, no GitHub call)
+"""</span></pre>
+          </div>
+        </div>
+        <h3>Function Reference</h3>
+        <table class="fn-table">
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Returns</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fn-name">_gh_headers()</td>
+              <td class="fn-ret">dict</td>
+              <td class="fn-desc">GitHub REST API authentication headers</td>
+            </tr>
+            <tr>
+              <td class="fn-name">_get_default_branch()</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                Fetch default branch from GitHub API; falls back to
+                <code style="font-family: monospace">"main"</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_get_all_repo_files(branch)</td>
+              <td class="fn-ret">list[dict]</td>
+              <td class="fn-desc">
+                Full recursive file tree via GitHub Git Trees API
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_fetch_file_content(path, branch)</td>
+              <td class="fn-ret">str | None</td>
+              <td class="fn-desc">
+                Download raw file content from GitHub raw URL
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_strip_html(html)</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                Strip tags, decode HTML entities, return clean plain text
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_ext(path)</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                Return lowercase extension with dot, e.g.
+                <code style="font-family: monospace">.py</code>, or
+                <code style="font-family: monospace">""</code>
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">load_repo_documents(branch)</td>
+              <td class="fn-ret">(text_docs, binary_docs)</td>
+              <td class="fn-desc">
+                Load all repo files; split into text documents + binary stubs
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">load_local_docs()</td>
+              <td class="fn-ret">list[Document]</td>
+              <td class="fn-desc">
+                Auto-discover and load
+                <code style="font-family: monospace">.html .md .txt .rst</code>
+                files from project tree
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">split_docs(docs)</td>
+              <td class="fn-ret">list[Document]</td>
+              <td class="fn-desc">
+                500-char chunks with 50-char overlap using
+                <code style="font-family: monospace"
+                  >RecursiveCharacterTextSplitter</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">get_embeddings()</td>
+              <td class="fn-ret">HuggingFaceEmbeddings</td>
+              <td class="fn-desc">
+                Load
+                <code style="font-family: monospace"
+                  >sentence-transformers/all-MiniLM-L6-v2</code
+                >
+                embedding model
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">ingest_chroma(docs, emb)</td>
+              <td class="fn-ret">int</td>
+              <td class="fn-desc">
+                Embed + persist to ChromaDB; returns stored doc count
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">ingest_pgvector(docs, emb)</td>
+              <td class="fn-ret">None</td>
+              <td class="fn-desc">
+                Optionally embed + persist to PGVector (skipped if no
+                POSTGRES_URL)
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">main()</td>
+              <td class="fn-ret">None</td>
+              <td class="fn-desc">
+                CLI entry point: parse
+                <code style="font-family: monospace">--reingest</code> /
+                <code style="font-family: monospace">--docs-only</code> flags
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash — cli</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>python ingest.py               <span class="cm"># full index</span>
+python ingest.py --reingest    <span class="cm"># wipe &amp; re-index</span>
+python ingest.py --docs-only   <span class="cm"># local docs only (fast)</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- rag_query.py -->
+      <section id="mod-rag-query">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>rag_query.py</h2>
+        </div>
+        <div class="file-badge">rag_query.py</div>
+        <p>
+          Standalone LCEL RAG chain tester. Useful for verifying the ChromaDB
+          store and Groq API key independently of the MCP server.
+        </p>
+        <h3>Function Reference</h3>
+        <table class="fn-table">
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Returns</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fn-name">_format_docs(docs)</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                Join retrieved docs into a context string with
+                <code style="font-family: monospace">[filename]</code> headers
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">build_chain()</td>
+              <td class="fn-ret">chain</td>
+              <td class="fn-desc">
+                Build LCEL: retriever → format_docs → RAG prompt → Groq LLM →
+                parser
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">run_question(chain, question)</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                Invoke chain, print Q&amp;A, return answer string
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">main()</td>
+              <td class="fn-ret">None</td>
+              <td class="fn-desc">
+                CLI: run 3 built-in test questions or custom question from
+                <code style="font-family: monospace">sys.argv</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">bash — cli</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre>python rag_query.py                            <span class="cm"># 3 built-in test questions</span>
+python rag_query.py "How do I add a tool?"     <span class="cm"># custom question</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- config.py -->
+      <section id="mod-config">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>github_mcp/config.py</h2>
+        </div>
+        <div class="file-badge">github_mcp/config.py</div>
+        <p>
+          Load and expose environment variables as typed constants. All tools
+          import from this module rather than calling
+          <code style="font-family: monospace">os.environ</code> directly.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — file docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="st">"""Configuration module for GitHub MCP Server.
+
+Loads environment variables and provides configuration constants.
+"""</span></pre>
+          </div>
+        </div>
+        <table class="fn-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Type</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fn-name">GITHUB_TOKEN</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace">GITHUB_TOKEN</code> env var
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">DEFAULT_OWNER</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace">GITHUB_OWNER</code> env var
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">DEFAULT_REPO</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace">GITHUB_REPO</code> env var
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">DEFAULT_PROJECT</td>
+              <td class="fn-ret">int</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace">PROJECT_ID</code> env var
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">validate_config()</td>
+              <td class="fn-ret">None</td>
+              <td class="fn-desc">
+                Raises
+                <code style="font-family: monospace">RuntimeError</code> if
+                <code style="font-family: monospace">GITHUB_TOKEN</code> is
+                missing
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- constants.py -->
+      <section id="mod-constants">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>github_mcp/constants.py</h2>
+        </div>
+        <div class="file-badge">github_mcp/constants.py</div>
+        <p>
+          All GitHub API URLs and shared GraphQL query strings. Centralised to
+          avoid duplication across tool files.
+        </p>
+        <table class="fn-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Value / Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fn-name">GITHUB_API</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace"
+                  >https://api.github.com</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">GRAPHQL_URL</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace"
+                  >https://api.github.com/graphql</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">PAGE_SIZE</td>
+              <td class="fn-desc">
+                <code style="font-family: monospace">100</code> — max items per
+                GraphQL page
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">PROJECT_FIELDS_FRAGMENT</td>
+              <td class="fn-desc">
+                Shared GraphQL fragment for project field nodes
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">USER_PROJECT_QUERY</td>
+              <td class="fn-desc">GraphQL query for user-owned Projects v2</td>
+            </tr>
+            <tr>
+              <td class="fn-name">ORG_PROJECT_QUERY</td>
+              <td class="fn-desc">
+                GraphQL query for organisation-owned Projects v2
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">BUILTIN_FIELDS</td>
+              <td class="fn-desc">
+                Set of built-in field names to exclude from custom-field
+                listings
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- core/github_api.py -->
+      <section id="mod-github-api">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>github_mcp/core/github_api.py</h2>
+        </div>
+        <div class="file-badge">github_mcp/core/github_api.py</div>
+        <p>
+          Low-level GitHub API helpers shared by all tool files. Provides
+          authenticated HTTP headers and error-checking utilities for both REST
+          and GraphQL APIs.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — file docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="st">"""Core GitHub API helper functions.
+
+Provides utilities for making authenticated requests to
+GitHub's REST and GraphQL APIs.
+"""</span></pre>
+          </div>
+        </div>
+        <table class="fn-table">
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Returns</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fn-name">_headers()</td>
+              <td class="fn-ret">dict</td>
+              <td class="fn-desc">
+                REST API auth headers —
+                <code style="font-family: monospace">Authorization: Bearer</code
+                >, <code style="font-family: monospace">Accept</code>, API
+                version
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_gql_headers()</td>
+              <td class="fn-ret">dict</td>
+              <td class="fn-desc">
+                GraphQL headers — extends
+                <code style="font-family: monospace">_headers()</code> with
+                <code style="font-family: monospace"
+                  >Content-Type: application/json</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_raise_for_status(resp)</td>
+              <td class="fn-ret">None</td>
+              <td class="fn-desc">
+                Raise
+                <code style="font-family: monospace">RuntimeError</code> on HTTP
+                4xx/5xx with JSON detail from response body
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_gql_check(resp)</td>
+              <td class="fn-ret">dict</td>
+              <td class="fn-desc">
+                Raise on HTTP error AND on GraphQL-level
+                <code style="font-family: monospace">errors</code>; return
+                parsed JSON on success
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — usage</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="kw">from</span> ..core.github_api <span class="kw">import</span> _headers, _gql_headers, _raise_for_status, _gql_check
+
+<span class="cm"># REST call</span>
+resp = <span class="kw">await</span> client.get(url, headers=<span class="fn">_headers</span>())
+<span class="fn">_raise_for_status</span>(resp)
+
+<span class="cm"># GraphQL call</span>
+resp = <span class="kw">await</span> client.post(GRAPHQL_URL, headers=<span class="fn">_gql_headers</span>(), json={<span class="st">"query"</span>: q})
+data = <span class="fn">_gql_check</span>(resp)</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- utils/project_helpers.py -->
+      <section id="mod-helpers">
+        <div class="section-header">
+          <span class="section-number">Module</span>
+          <h2>github_mcp/utils/project_helpers.py</h2>
+        </div>
+        <div class="file-badge">github_mcp/utils/project_helpers.py</div>
+        <p>
+          Projects v2 resolution utilities shared by tasks, task_status,
+          project_fields, and task_fields tools.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="lang">python — file docstring</span>
+            <div class="code-dots"><span></span><span></span><span></span></div>
+          </div>
+          <div class="code-body">
+            <pre><span class="st">"""Project-specific helper functions.
+
+Provides utilities for working with GitHub Projects v2.
+"""</span></pre>
+          </div>
+        </div>
+        <table class="fn-table">
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Returns</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fn-name">
+                _resolve_project(client, owner, project_number)
+              </td>
+              <td class="fn-ret">dict</td>
+              <td class="fn-desc">
+                Try user query then org query; return
+                <code style="font-family: monospace">projectV2</code> node with
+                all fields
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_find_field(proj, name)</td>
+              <td class="fn-ret">dict</td>
+              <td class="fn-desc">
+                Find field node by name (case-insensitive); raise with available
+                names if not found
+              </td>
+            </tr>
+            <tr>
+              <td class="fn-name">_inline_value(data_type, value)</td>
+              <td class="fn-ret">str</td>
+              <td class="fn-desc">
+                Build inline
+                <code style="font-family: monospace"
+                  >{ date/number/text: ... }</code
+                >
+                block required by GitHub GraphQL mutations
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout callout-blue">
+          <div class="callout-icon">ℹ️</div>
+          <div class="callout-body">
+            <strong>_inline_value type detection</strong>
+            <p>
+              Trusts explicit
+              <code style="font-family: monospace">data_type</code> metadata
+              first; auto-detects
+              <code style="font-family: monospace">YYYY-MM-DD</code> strings as
+              dates and pure numbers as numbers; falls back to text. Ensures
+              correct format even when the GitHub API returns an empty
+              <code style="font-family: monospace">dataType</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // Highlight active nav link on scroll
+      const sections = document.querySelectorAll("section[id]");
+      const navLinks = document.querySelectorAll(".nav-link");
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              navLinks.forEach((l) => l.classList.remove("active"));
+              const active = document.querySelector(
+                '.nav-link[href="#' + e.target.id + '"]',
+              );
+              if (active) active.classList.add("active");
+            }
+          });
+        },
+        { rootMargin: "-20% 0px -70% 0px" },
+      );
+      sections.forEach((s) => observer.observe(s));
+    </script>
+  </body>
+</html>
