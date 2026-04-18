@@ -9,7 +9,7 @@ import sys
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from contextlib import asynccontextmanager
 
@@ -67,10 +67,17 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+_origins = os.environ.get(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"
+).split(",")
+_origin_regex = (
+    os.environ.get("CORS_ORIGIN_REGEX", "").strip()
+    or r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _origins],
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,7 +100,9 @@ if __name__ == "__main__":
     import uvicorn
 
     parser = argparse.ArgumentParser(description="GitHub MCP FastAPI BFF")
-    parser.add_argument("--port", type=int, default=int(os.environ.get("API_PORT", 8091)))
+    parser.add_argument(
+        "--port", type=int, default=int(os.environ.get("API_PORT", 8091))
+    )
     parser.add_argument("--host", default=os.environ.get("API_HOST", "0.0.0.0"))
     parser.add_argument("--reload", action="store_true", default=False)
     args = parser.parse_args()

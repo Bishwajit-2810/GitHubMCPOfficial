@@ -20,9 +20,15 @@ class ApiService {
   }
 
   /// Exchange GitHub OAuth code for stored access token. Returns granted scopes.
-  Future<List<String>> connectGithub(String code) async {
+  Future<List<String>> connectGithub(String code, {String? redirectUri}) async {
     final resp = await _call(
-      () => _dio.post('/auth/connect-github', data: {'code': code}),
+      () => _dio.post(
+        '/auth/connect-github',
+        data: {
+          'code': code,
+          if (redirectUri != null) 'redirect_uri': redirectUri,
+        },
+      ),
     );
     return (resp['scopes'] as List<dynamic>).map((e) => e as String).toList();
   }
@@ -51,12 +57,15 @@ class ApiService {
     int limit = 50,
   }) async {
     final resp = await _call(
-      () => _dio.post('/tools/list-tasks', data: {
-        if (owner != null) 'owner': owner,
-        if (projectNumber != null) 'project_number': projectNumber,
-        'offset': offset,
-        'limit': limit,
-      }),
+      () => _dio.post(
+        '/tools/list-tasks',
+        data: {
+          if (owner != null) 'owner': owner,
+          if (projectNumber != null) 'project_number': projectNumber,
+          'offset': offset,
+          'limit': limit,
+        },
+      ),
     );
     final items = resp['items'] as List<dynamic>? ?? [];
     return items.map((e) => Task.fromJson(e as Map<String, dynamic>)).toList();
@@ -74,15 +83,75 @@ class ApiService {
     String? label,
   }) async {
     return _call(
-      () => _dio.post('/tools/create-task', data: {
-        'title': title,
-        'body': body,
-        if (status != null) 'status': status,
+      () => _dio.post(
+        '/tools/create-task',
+        data: {
+          'title': title,
+          'body': body,
+          if (status != null) 'status': status,
+          if (owner != null) 'owner': owner,
+          if (repo != null) 'repo': repo,
+          if (projectNumber != null) 'project_number': projectNumber,
+          if (assignee != null) 'assignee': assignee,
+          if (label != null) 'label': label,
+        },
+      ),
+    );
+  }
+
+  /// POST /tools/list-files
+  Future<Map<String, dynamic>> listFiles({
+    String path = '',
+    String? owner,
+    String? repo,
+    String? ref,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/list-files', data: {
+        'path': path,
         if (owner != null) 'owner': owner,
         if (repo != null) 'repo': repo,
-        if (projectNumber != null) 'project_number': projectNumber,
-        if (assignee != null) 'assignee': assignee,
-        if (label != null) 'label': label,
+        if (ref != null) 'ref': ref,
+      }),
+    );
+  }
+
+  /// POST /tools/create-branch
+  Future<Map<String, dynamic>> createBranch({
+    required String branch,
+    String? sourceBranch,
+    String? owner,
+    String? repo,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/create-branch', data: {
+        'branch': branch,
+        if (sourceBranch != null) 'source_branch': sourceBranch,
+        if (owner != null) 'owner': owner,
+        if (repo != null) 'repo': repo,
+      }),
+    );
+  }
+
+  /// POST /tools/create-pull-request
+  Future<Map<String, dynamic>> createPullRequest({
+    required String title,
+    required String head,
+    String body = '',
+    String? base,
+    bool draft = false,
+    String? owner,
+    String? repo,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/create-pull-request', data: {
+        'title': title,
+        'head': head,
+        'body': body,
+        if (base != null) 'base': base,
+        'draft': draft,
+        if (owner != null) 'owner': owner,
+        if (repo != null) 'repo': repo,
       }),
     );
   }
@@ -94,11 +163,14 @@ class ApiService {
     String? repo,
   }) async {
     return _call(
-      () => _dio.post('/tools/ask-codebase', data: {
-        'question': question,
-        if (owner != null) 'owner': owner,
-        if (repo != null) 'repo': repo,
-      }),
+      () => _dio.post(
+        '/tools/ask-codebase',
+        data: {
+          'question': question,
+          if (owner != null) 'owner': owner,
+          if (repo != null) 'repo': repo,
+        },
+      ),
     );
   }
 
