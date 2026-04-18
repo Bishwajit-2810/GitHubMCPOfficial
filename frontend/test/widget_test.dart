@@ -17,7 +17,6 @@ void main() {
       ));
       expect(find.text('GitHub MCP'), findsOneWidget);
       expect(find.text('Continue with Google'), findsOneWidget);
-      expect(find.text('Continue with GitHub'), findsOneWidget);
       expect(find.text('Continue with Email'), findsOneWidget);
     });
 

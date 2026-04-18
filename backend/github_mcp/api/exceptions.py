@@ -46,9 +46,17 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception(f"Unhandled error | path={request.url.path}")
+    # ServerErrorMiddleware (which calls this handler) sits OUTSIDE CORSMiddleware,
+    # so CORS headers are not automatically added. Add them manually here.
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
         status_code=500,
         content=_error_envelope("INTERNAL_ERROR", "An unexpected error occurred"),
+        headers=headers,
     )
 
 

@@ -1,7 +1,5 @@
 """Smoke tests for /health and /ready endpoints."""
 
-from unittest.mock import patch
-
 
 def test_health(client):
     resp = client.get("/health")
@@ -21,7 +19,18 @@ def test_ready_db_ok(client):
 
 def test_ready_db_fail(client):
     """When DB raises, /ready returns 503."""
-    import github_mcp.api.routes.health as health_module
-    with patch.object(health_module, "SessionLocal", side_effect=Exception("db down")):
-        resp = client.get("/ready")
+    from api_server import app
+    from github_mcp.api.db import get_db_dep
+
+    class BrokenSession:
+        def execute(self, *_args, **_kwargs):
+            raise Exception("db down")
+
+    def broken_db_dep():
+        yield BrokenSession()
+
+    app.dependency_overrides[get_db_dep] = broken_db_dep
+    resp = client.get("/ready")
+    app.dependency_overrides.pop(get_db_dep, None)
+
     assert resp.status_code == 503

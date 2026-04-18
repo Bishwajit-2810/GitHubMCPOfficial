@@ -266,7 +266,7 @@ OpenAPI schema: `http://localhost:8091/openapi.json`
 
 ## Auth Flow (BFF)
 
-Both Google and email/password sign-in go through Firebase — the app gets a Firebase ID token and the BFF verifies it the same way regardless of provider.
+Google and email/password sign-in go through Firebase — the app gets a Firebase ID token and the BFF verifies it the same way for both. GitHub is **not** a sign-in method; it is only used post-login via the Connect GitHub flow to grant `repo`, `read:org`, and `project` scopes for tool access.
 
 ```text
 1. User signs in via Firebase (Google or email/password) → Firebase returns ID token

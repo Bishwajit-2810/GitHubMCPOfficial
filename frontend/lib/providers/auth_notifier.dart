@@ -31,19 +31,22 @@ class AuthState {
     String? error,
     bool clearError = false,
     bool clearToken = false,
-  }) =>
-      AuthState(
-        isLoading: isLoading ?? this.isLoading,
-        firebaseUser: firebaseUser ?? this.firebaseUser,
-        backendToken: clearToken ? null : (backendToken ?? this.backendToken),
-        githubConnected: githubConnected ?? this.githubConnected,
-        error: clearError ? null : (error ?? this.error),
-      );
+  }) => AuthState(
+    isLoading: isLoading ?? this.isLoading,
+    firebaseUser: firebaseUser ?? this.firebaseUser,
+    backendToken: clearToken ? null : (backendToken ?? this.backendToken),
+    githubConnected: githubConnected ?? this.githubConnected,
+    error: clearError ? null : (error ?? this.error),
+  );
 }
 
 class AuthNotifier extends ChangeNotifier {
-  AuthNotifier(this._api, this._dio,
-      {bool restoreOnInit = true, AuthState initialState = const AuthState()}) {
+  AuthNotifier(
+    this._api,
+    this._dio, {
+    bool restoreOnInit = true,
+    AuthState initialState = const AuthState(),
+  }) {
     _state = initialState;
     if (restoreOnInit) _restoreSession();
   }
@@ -66,11 +69,13 @@ class AuthNotifier extends ChangeNotifier {
     final ghConnected = await StorageService.isGithubConnected();
     if (token != null) {
       _setDioToken(token);
-      _setState(_state.copyWith(
-        backendToken: token,
-        githubConnected: ghConnected,
-        firebaseUser: FirebaseAuth.instance.currentUser,
-      ));
+      _setState(
+        _state.copyWith(
+          backendToken: token,
+          githubConnected: ghConnected,
+          firebaseUser: FirebaseAuth.instance.currentUser,
+        ),
+      );
     }
   }
 
@@ -79,6 +84,17 @@ class AuthNotifier extends ChangeNotifier {
   Future<void> signInWithGoogle() async {
     _setState(_state.copyWith(isLoading: true, clearError: true));
     try {
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider();
+        final result = await FirebaseAuth.instance.signInWithPopup(provider);
+        if (result.user == null) {
+          _setState(_state.copyWith(isLoading: false));
+          return;
+        }
+        await _exchangeFirebaseToken(result.user!);
+        return;
+      }
+
       final googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
         _setState(_state.copyWith(isLoading: false));
@@ -89,25 +105,10 @@ class AuthNotifier extends ChangeNotifier {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      final result =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      final result = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       await _exchangeFirebaseToken(result.user!);
-    } on ApiError catch (e) {
-      _setState(_state.copyWith(isLoading: false, error: e.message));
-    } catch (e) {
-      _setState(_state.copyWith(isLoading: false, error: e.toString()));
-    }
-  }
-
-  Future<void> signInWithGithub() async {
-    _setState(_state.copyWith(isLoading: true, clearError: true));
-    try {
-      final provider = GithubAuthProvider();
-      final result =
-          await FirebaseAuth.instance.signInWithProvider(provider);
-      await _exchangeFirebaseToken(result.user!);
-    } on FirebaseAuthException catch (e) {
-      _setState(_state.copyWith(isLoading: false, error: e.message));
     } on ApiError catch (e) {
       _setState(_state.copyWith(isLoading: false, error: e.message));
     } catch (e) {
@@ -135,8 +136,7 @@ class AuthNotifier extends ChangeNotifier {
   Future<void> createEmailAccount(String email, String password) async {
     _setState(_state.copyWith(isLoading: true, clearError: true));
     try {
-      final result =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final result = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -158,20 +158,22 @@ class AuthNotifier extends ChangeNotifier {
     _setDioToken(backendToken);
     await StorageService.saveToken(backendToken);
     final ghConnected = await StorageService.isGithubConnected();
-    _setState(_state.copyWith(
-      isLoading: false,
-      firebaseUser: user,
-      backendToken: backendToken,
-      githubConnected: ghConnected,
-    ));
+    _setState(
+      _state.copyWith(
+        isLoading: false,
+        firebaseUser: user,
+        backendToken: backendToken,
+        githubConnected: ghConnected,
+      ),
+    );
   }
 
   // ── GitHub backend OAuth (repo/project scopes) ────────────────────────────
 
-  Future<void> connectGithub(String code) async {
+  Future<void> connectGithub(String code, {String? redirectUri}) async {
     _setState(_state.copyWith(isLoading: true, clearError: true));
     try {
-      await _api.connectGithub(code);
+      await _api.connectGithub(code, redirectUri: redirectUri);
       await StorageService.setGithubConnected(true);
       _setState(_state.copyWith(isLoading: false, githubConnected: true));
     } on ApiError catch (e) {

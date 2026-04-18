@@ -90,7 +90,7 @@ class StubApiService extends Fake implements ApiService {
   }
 
   @override
-  Future<List<String>> connectGithub(String code) async {
+  Future<List<String>> connectGithub(String code, {String? redirectUri}) async {
     if (errorToThrow != null) throw errorToThrow!;
     return ['repo', 'read:org', 'project'];
   }
@@ -100,36 +100,46 @@ class StubApiService extends Fake implements ApiService {
 
 class FakeAuth extends AuthNotifier {
   FakeAuth(AuthState initial)
-      : super(StubApiService(), Dio(),
-            restoreOnInit: false, initialState: initial);
+    : super(
+        StubApiService(),
+        Dio(),
+        restoreOnInit: false,
+        initialState: initial,
+      );
 
-  @override Future<void> signInWithGoogle() async {}
-  @override Future<void> signInWithGithub() async {}
-  @override Future<void> signInWithEmail(String e, String p) async {}
-  @override Future<void> createEmailAccount(String e, String p) async {}
-  @override Future<void> connectGithub(String code) async {}
-  @override Future<void> signOut() async {}
-  @override void onUnauthorized() {}
+  @override
+  Future<void> signInWithGoogle() async {}
+  @override
+  Future<void> signInWithEmail(String e, String p) async {}
+  @override
+  Future<void> createEmailAccount(String e, String p) async {}
+  @override
+  Future<void> connectGithub(String code, {String? redirectUri}) async {}
+  @override
+  Future<void> signOut() async {}
+  @override
+  void onUnauthorized() {}
 }
 
 class FakeContext extends ContextNotifier {
   FakeContext(ContextState initial)
-      : super(StubApiService(), initialState: initial);
+    : super(StubApiService(), initialState: initial);
 
-  @override Future<void> load() async {}
-  @override Future<bool> save({
-    String? owner,
-    String? repo,
-    int? projectNumber,
-  }) async => true;
+  @override
+  Future<void> load() async {}
+  @override
+  Future<bool> save({String? owner, String? repo, int? projectNumber}) async =>
+      true;
 }
 
 class FakeTasks extends TasksNotifier {
   FakeTasks(TasksState initial)
-      : super(StubApiService(), initialState: initial);
+    : super(StubApiService(), initialState: initial);
 
-  @override Future<void> load({String? owner, int? projectNumber}) async {}
-  @override Future<bool> create({
+  @override
+  Future<void> load({String? owner, int? projectNumber}) async {}
+  @override
+  Future<bool> create({
     required String title,
     String body = '',
     String? status,
@@ -144,8 +154,10 @@ class FakeTasks extends TasksNotifier {
 class FakeRag extends RagNotifier {
   FakeRag(RagState initial) : super(StubApiService(), initialState: initial);
 
-  @override Future<void> ask(String q, {String? owner, String? repo}) async {}
-  @override void reset() {}
+  @override
+  Future<void> ask(String q, {String? owner, String? repo}) async {}
+  @override
+  void reset() {}
 }
 
 // ── Widget wrapper ────────────────────────────────────────────────────────────
@@ -156,17 +168,20 @@ Widget wrap(
   ContextNotifier? ctx,
   TasksNotifier? tasks,
   RagNotifier? rag,
-}) =>
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<AuthNotifier>.value(
-            value: auth ?? FakeAuth(const AuthState())),
-        ChangeNotifierProvider<ContextNotifier>.value(
-            value: ctx ?? FakeContext(const ContextState())),
-        ChangeNotifierProvider<TasksNotifier>.value(
-            value: tasks ?? FakeTasks(const TasksState())),
-        ChangeNotifierProvider<RagNotifier>.value(
-            value: rag ?? FakeRag(const RagState())),
-      ],
-      child: MaterialApp(home: child),
-    );
+}) => MultiProvider(
+  providers: [
+    ChangeNotifierProvider<AuthNotifier>.value(
+      value: auth ?? FakeAuth(const AuthState()),
+    ),
+    ChangeNotifierProvider<ContextNotifier>.value(
+      value: ctx ?? FakeContext(const ContextState()),
+    ),
+    ChangeNotifierProvider<TasksNotifier>.value(
+      value: tasks ?? FakeTasks(const TasksState()),
+    ),
+    ChangeNotifierProvider<RagNotifier>.value(
+      value: rag ?? FakeRag(const RagState()),
+    ),
+  ],
+  child: MaterialApp(home: child),
+);

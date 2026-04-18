@@ -78,15 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? null
                     : () => context.read<AuthNotifier>().signInWithGoogle(),
               ),
-              const SizedBox(height: 12),
-
-              _SocialButton(
-                icon: Icons.code,
-                label: 'Continue with GitHub',
-                onPressed: auth.isLoading
-                    ? null
-                    : () => context.read<AuthNotifier>().signInWithGithub(),
-              ),
               const SizedBox(height: 20),
 
               Row(children: [

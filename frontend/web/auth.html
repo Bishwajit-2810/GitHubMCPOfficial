@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OAuth Callback</title>
+  </head>
+  <body>
+    <p>Completing authentication&hellip;</p>
+    <script>
+      // flutter_web_auth_2 v4 polls localStorage['flutter-web-auth-2'] every second.
+      // window.opener is unreliable after cross-origin navigation through github.com,
+      // so localStorage is the correct mechanism here.
+      window.localStorage.setItem('flutter-web-auth-2', window.location.href);
+      window.close();
+    </script>
+  </body>
+</html>

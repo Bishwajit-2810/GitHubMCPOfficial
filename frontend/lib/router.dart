@@ -6,6 +6,9 @@ import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/tasks/task_list_screen.dart';
 import 'screens/tasks/create_task_screen.dart';
 import 'screens/rag/ask_codebase_screen.dart';
+import 'screens/repo/files_screen.dart';
+import 'screens/repo/create_branch_screen.dart';
+import 'screens/repo/create_pr_screen.dart';
 import 'screens/settings/repo_selector_screen.dart';
 
 class RouterNotifier extends ChangeNotifier {
@@ -59,6 +62,18 @@ GoRouter buildRouter(AuthNotifier auth) {
       GoRoute(
         path: '/ask',
         builder: (context, _) => const AskCodebaseScreen(),
+      ),
+      GoRoute(
+        path: '/files',
+        builder: (context, _) => const FilesScreen(),
+      ),
+      GoRoute(
+        path: '/branch/create',
+        builder: (context, _) => const CreateBranchScreen(),
+      ),
+      GoRoute(
+        path: '/pr/create',
+        builder: (context, _) => const CreatePRScreen(),
       ),
       GoRoute(
         path: '/settings',
