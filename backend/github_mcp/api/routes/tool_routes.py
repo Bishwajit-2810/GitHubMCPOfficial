@@ -130,6 +130,24 @@ class AskCodebaseRequest(BaseModel):
     repo: Optional[str] = None
 
 
+class ExploreCodebaseRequest(BaseModel):
+    query: str
+
+
+class CreateProjectFieldRequest(BaseModel):
+    field_name: str
+    field_type: str  # "text" | "number" | "date"
+    project_number: Optional[int] = None
+    owner: Optional[str] = None
+
+
+class SetTaskFieldsRequest(BaseModel):
+    item_id: str
+    fields: dict
+    project_number: Optional[int] = None
+    owner: Optional[str] = None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/list-files")
@@ -633,3 +651,157 @@ async def ask_codebase(
         for d in docs
     ))
     return {"question": body.question, "answer": answer, "sources": sources}
+
+
+@router.post("/explore-codebase")
+async def explore_codebase(
+    body: ExploreCodebaseRequest,
+    user: User = Depends(get_current_user),
+):
+    """File-level explorer over the indexed repository."""
+    import os
+
+    logger.info(f"explore_codebase | user={user.id} query={body.query[:80]!r}")
+
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    if not groq_key:
+        from ..exceptions import AppError
+        raise AppError("CONFIG_ERROR", "GROQ_API_KEY not configured", status_code=500)
+
+    from github_mcp.tools.rag_query import _build_file_index, _get_retriever, _EXPLORE_PROMPT, _format_docs
+    from collections import defaultdict
+
+    file_index = _build_file_index()
+    total_files = len(file_index)
+
+    ext_counter: dict = defaultdict(int)
+    for info in file_index.values():
+        ext_counter[info["extension"] or "(no ext)"] += 1
+    file_summary = dict(sorted(ext_counter.items()))
+
+    all_images = [
+        {"filename": info["filename"], "folder": info["folder"], "url": info["url"]}
+        for info in file_index.values()
+        if info["file_type"] == "image"
+    ]
+
+    docs = _get_retriever().invoke(body.query)
+    context_str = _format_docs(docs)
+
+    from langchain_groq import ChatGroq
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+
+    llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
+    prompt = ChatPromptTemplate.from_template(_EXPLORE_PROMPT)
+    chain = prompt | llm | StrOutputParser()
+    answer = await chain.ainvoke({"context": context_str, "question": body.query})
+
+    return {
+        "query": body.query,
+        "answer": answer,
+        "total_files": total_files,
+        "file_summary": file_summary,
+        "images": all_images,
+    }
+
+
+@router.post("/create-project-field")
+async def create_project_field(
+    body: CreateProjectFieldRequest,
+    db: Session = Depends(get_db_dep),
+    user: User = Depends(get_current_user),
+    conn: OAuthConnection = Depends(require_project_scope),
+):
+    import httpx
+    from github_mcp.constants import GRAPHQL_URL
+    from github_mcp.core.github_api import _gql_headers, _gql_check
+    from github_mcp.utils.project_helpers import _resolve_project
+    from github_mcp.config import DEFAULT_OWNER, DEFAULT_PROJECT
+
+    defaults = _ctx_defaults(user, db)
+    owner = body.owner or defaults["owner"] or DEFAULT_OWNER
+    project_number = body.project_number or defaults["project_number"] or DEFAULT_PROJECT
+    token = _token(conn)
+
+    TYPE_MAP = {"text": "TEXT", "number": "NUMBER", "date": "DATE"}
+    gql_type = TYPE_MAP.get(body.field_type.lower())
+    if not gql_type:
+        from ..exceptions import AppError
+        raise AppError("INVALID_TYPE", f"field_type must be one of: text, number, date", status_code=422)
+
+    async with httpx.AsyncClient() as client:
+        proj = await _resolve_project(client, owner, project_number)
+        project_id = proj["id"]
+
+        existing = next(
+            (f for f in proj.get("fields", {}).get("nodes", []) or []
+             if f and f.get("name", "").lower() == body.field_name.lower()),
+            None,
+        )
+        if existing:
+            return {"project_id": project_id, "field_id": existing["id"],
+                    "field_name": existing["name"], "field_type": body.field_type, "created": False}
+
+        mut = """mutation($pid:ID!,$name:String!,$dt:ProjectV2CustomFieldType!){
+          createProjectV2Field(input:{projectId:$pid,name:$name,dataType:$dt}){
+            projectV2Field{...on ProjectV2Field{id name dataType}}
+          }
+        }"""
+        r = await client.post(GRAPHQL_URL, headers=_gql_headers(token), json={
+            "query": mut, "variables": {"pid": project_id, "name": body.field_name, "dt": gql_type},
+        })
+        data = _gql_check(r)
+        field = data["data"]["createProjectV2Field"]["projectV2Field"]
+
+    return {"project_id": project_id, "field_id": field["id"],
+            "field_name": field["name"], "field_type": body.field_type, "created": True}
+
+
+@router.post("/set-task-fields")
+async def set_task_fields(
+    body: SetTaskFieldsRequest,
+    db: Session = Depends(get_db_dep),
+    user: User = Depends(get_current_user),
+    conn: OAuthConnection = Depends(require_project_scope),
+):
+    import httpx
+    from github_mcp.constants import GRAPHQL_URL
+    from github_mcp.core.github_api import _gql_headers, _gql_check
+    from github_mcp.utils.project_helpers import _resolve_project, _inline_value
+    from github_mcp.config import DEFAULT_OWNER, DEFAULT_PROJECT
+
+    if not body.item_id or not body.item_id.startswith("PVTI_"):
+        from ..exceptions import AppError
+        raise AppError("INVALID_ITEM_ID", "item_id must start with PVTI_", status_code=422)
+
+    defaults = _ctx_defaults(user, db)
+    owner = body.owner or defaults["owner"] or DEFAULT_OWNER
+    project_number = body.project_number or defaults["project_number"] or DEFAULT_PROJECT
+    token = _token(conn)
+
+    async with httpx.AsyncClient() as client:
+        proj = await _resolve_project(client, owner, project_number)
+        project_id = proj["id"]
+
+        field_nodes = [f for f in (proj.get("fields", {}).get("nodes", []) or []) if f]
+        field_map = {f["name"].lower(): f for f in field_nodes if f.get("name")}
+
+        invalid = [k for k in body.fields if k.lower() not in field_map]
+        if invalid:
+            from ..exceptions import AppError
+            valid_names = [f["name"] for f in field_nodes if f.get("name")]
+            raise AppError("INVALID_FIELDS", f"Unknown fields: {invalid}. Valid: {valid_names}", status_code=422)
+
+        updated = []
+        for field_name, value in body.fields.items():
+            field = field_map[field_name.lower()]
+            field_id = field["id"]
+            data_type = field.get("dataType", "TEXT")
+            val_input = _inline_value(data_type, value)
+            mut = f'mutation{{updateProjectV2ItemFieldValue(input:{{projectId:"{project_id}",itemId:"{body.item_id}",fieldId:"{field_id}",value:{{{val_input}}}}})}}'
+            r = await client.post(GRAPHQL_URL, headers=_gql_headers(token), json={"query": mut})
+            _gql_check(r)
+            updated.append(field_name)
+
+    return {"item_id": body.item_id, "updated_fields": updated}
