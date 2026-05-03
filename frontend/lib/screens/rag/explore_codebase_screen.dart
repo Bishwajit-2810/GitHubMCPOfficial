@@ -4,20 +4,25 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
-import '../../providers/providers.dart';
+import '../../models/api_error.dart';
+import '../../services/api_service.dart';
 import '../../utils/file_icons.dart';
 import '../../widgets/bouncing_dots.dart';
 
-class AskCodebaseScreen extends StatefulWidget {
-  const AskCodebaseScreen({super.key});
+class ExploreCodebaseScreen extends StatefulWidget {
+  const ExploreCodebaseScreen({super.key});
 
   @override
-  State<AskCodebaseScreen> createState() => _AskCodebaseScreenState();
+  State<ExploreCodebaseScreen> createState() =>
+      _ExploreCodebaseScreenState();
 }
 
-class _AskCodebaseScreenState extends State<AskCodebaseScreen> {
+class _ExploreCodebaseScreenState extends State<ExploreCodebaseScreen> {
   final _ctrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  bool _isLoading = false;
+  String? _error;
+  Map<String, dynamic>? _result;
   String? _lastQuestion;
 
   @override
@@ -27,30 +32,39 @@ class _AskCodebaseScreenState extends State<AskCodebaseScreen> {
     super.dispose();
   }
 
-  void _ask() {
+  Future<void> _explore() async {
     final q = _ctrl.text.trim();
     if (q.isEmpty) return;
-    setState(() => _lastQuestion = q);
+    setState(() {
+      _lastQuestion = q;
+      _isLoading = true;
+      _error = null;
+      _result = null;
+    });
     _ctrl.clear();
-    final ctx = context.read<ContextNotifier>().state.context;
-    context.read<RagNotifier>().ask(
-          q,
-          owner: ctx.selectedOwner,
-          repo: ctx.selectedRepo,
-        );
     FocusScope.of(context).unfocus();
+    try {
+      final api = context.read<ApiService>();
+      final result = await api.exploreCodebase(query: q);
+      if (mounted) setState(() { _result = result; _isLoading = false; });
+    } on ApiError catch (e) {
+      if (mounted) setState(() { _error = e.message; _isLoading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _isLoading = false; });
+    }
   }
 
   void _reset() {
     _ctrl.clear();
-    setState(() => _lastQuestion = null);
-    context.read<RagNotifier>().reset();
+    setState(() {
+      _result = null;
+      _error = null;
+      _lastQuestion = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<RagNotifier>().state;
-
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(
@@ -67,15 +81,15 @@ class _AskCodebaseScreenState extends State<AskCodebaseScreen> {
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.auto_awesome_rounded,
+              child: const Icon(Icons.manage_search_rounded,
                   size: 16, color: Colors.white),
             ),
             const SizedBox(width: 10),
-            const Text('Ask Codebase'),
+            const Text('Explore Codebase'),
           ],
         ),
         actions: [
-          if (state.answer != null || _lastQuestion != null)
+          if (_result != null || _lastQuestion != null)
             TextButton.icon(
               icon: const Icon(Icons.add_rounded, size: 16),
               label: const Text('New'),
@@ -87,45 +101,46 @@ class _AskCodebaseScreenState extends State<AskCodebaseScreen> {
       ),
       body: Column(
         children: [
-          Expanded(child: _buildBody(state)),
+          Expanded(child: _buildBody()),
           _ChatInputBar(
             ctrl: _ctrl,
-            isLoading: state.isLoading,
-            onSend: _ask,
-            hintText: 'Ask anything about the codebase…',
+            isLoading: _isLoading,
+            onSend: _explore,
+            hintText: 'Explore the repository structure…',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBody(RagState state) {
-    if (state.isLoading) {
-      return _ThinkingView(question: _lastQuestion)
+  Widget _buildBody() {
+    if (_isLoading) {
+      return _ExploreThinkingView(question: _lastQuestion)
           .animate()
           .fadeIn(duration: 200.ms);
     }
-    if (state.error != null) {
-      return _ErrorView(error: state.error!);
+    if (_error != null) {
+      return _ExploreErrorView(
+          error: _error!, onRetry: _explore);
     }
-    if (state.answer != null) {
-      return _AnswerView(
+    if (_result != null) {
+      return _ExploreResultView(
         question: _lastQuestion ?? '',
-        answer: state.answer!,
-        sources: state.sources,
+        result: _result!,
         scrollCtrl: _scrollCtrl,
       );
     }
-    return _EmptyHint(onSuggestion: (s) => _ctrl.text = s);
+    return _ExploreEmptyHint(
+        onSuggestion: (s) => _ctrl.text = s);
   }
 }
 
-// ── Thinking animation ─────────────────────────────────────────────────────────
+// ── Thinking view ──────────────────────────────────────────────────────────────
 
-class _ThinkingView extends StatelessWidget {
+class _ExploreThinkingView extends StatelessWidget {
   final String? question;
 
-  const _ThinkingView({this.question});
+  const _ExploreThinkingView({this.question});
 
   @override
   Widget build(BuildContext context) {
@@ -141,10 +156,11 @@ class _ThinkingView extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _AiAvatar(),
+              _ExploreAvatar(),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
                   borderRadius: const BorderRadius.only(
@@ -154,7 +170,7 @@ class _ThinkingView extends StatelessWidget {
                   ),
                   border: Border.all(color: AppTheme.border),
                 ),
-                child: const BouncingDots(label: 'Thinking…'),
+                child: const BouncingDots(label: 'Exploring…'),
               ),
             ],
           ),
@@ -164,24 +180,28 @@ class _ThinkingView extends StatelessWidget {
   }
 }
 
-// ── Answer view ────────────────────────────────────────────────────────────────
+// ── Result view ────────────────────────────────────────────────────────────────
 
-class _AnswerView extends StatelessWidget {
+class _ExploreResultView extends StatelessWidget {
   final String question;
-  final String answer;
-  final List<String> sources;
+  final Map<String, dynamic> result;
   final ScrollController scrollCtrl;
 
-  const _AnswerView({
+  const _ExploreResultView({
     required this.question,
-    required this.answer,
-    required this.sources,
+    required this.result,
     required this.scrollCtrl,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final answer = result['answer'] as String? ?? '';
+    final totalFiles = result['total_files'] as int? ?? 0;
+    final fileSummary =
+        result['file_summary'] as Map<String, dynamic>? ?? {};
+    final images = result['images'] as List<dynamic>? ?? [];
+
     final mdStyle = MarkdownStyleSheet.fromTheme(theme).copyWith(
       p: theme.textTheme.bodyMedium?.copyWith(height: 1.65),
       h1: theme.textTheme.titleLarge,
@@ -206,12 +226,6 @@ class _AnswerView extends StatelessWidget {
           const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       strong: theme.textTheme.bodyMedium?.copyWith(
           fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-      em: theme.textTheme.bodyMedium?.copyWith(
-          fontStyle: FontStyle.italic, color: AppTheme.textSecondary),
-      tableHead: theme.textTheme.bodySmall
-          ?.copyWith(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-      tableBody: theme.textTheme.bodySmall,
-      tableBorder: TableBorder.all(color: AppTheme.border),
       horizontalRuleDecoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppTheme.border)),
       ),
@@ -227,10 +241,12 @@ class _AnswerView extends StatelessWidget {
             _QuestionBubble(text: question),
             const SizedBox(height: 16),
           ],
+
+          // Answer bubble
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _AiAvatar(),
+              _ExploreAvatar(),
               const SizedBox(width: 10),
               Expanded(
                 child: Container(
@@ -253,68 +269,22 @@ class _AnswerView extends StatelessWidget {
               ),
             ],
           ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.08),
-          if (sources.isNotEmpty) ...[
+
+          // Stats cards
+          if (totalFiles > 0) ...[
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.source_rounded,
-                          size: 13, color: AppTheme.textMuted),
-                      SizedBox(width: 6),
-                      Text(
-                        'SOURCES',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: sources.map((s) {
-                      final fileName = s.split('/').last;
-                      final fs = fileStyleFor(fileName, false);
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: fs.color.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: fs.color.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(fs.icon, size: 12, color: fs.color),
-                            const SizedBox(width: 5),
-                            Text(
-                              s,
-                              style: TextStyle(
-                                  fontSize: 11, color: fs.color),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: 200.ms, duration: 300.ms),
+            _StatsPanel(
+              totalFiles: totalFiles,
+              fileSummary: fileSummary,
+            ).animate().fadeIn(delay: 150.ms, duration: 300.ms),
+          ],
+
+          // Images list
+          if (images.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _ImagesList(images: images)
+                .animate()
+                .fadeIn(delay: 250.ms, duration: 300.ms),
           ],
         ],
       ),
@@ -322,20 +292,167 @@ class _AnswerView extends StatelessWidget {
   }
 }
 
-// ── Empty hint with suggestion chips ─────────────────────────────────────────
+// ── Stats panel ────────────────────────────────────────────────────────────────
 
-class _EmptyHint extends StatelessWidget {
+class _StatsPanel extends StatelessWidget {
+  final int totalFiles;
+  final Map<String, dynamic> fileSummary;
+
+  const _StatsPanel(
+      {required this.totalFiles, required this.fileSummary});
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = fileSummary.entries.toList()
+      ..sort((a, b) => (b.value as int).compareTo(a.value as int));
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.analytics_rounded,
+                  size: 14, color: AppTheme.textMuted),
+              const SizedBox(width: 6),
+              Text(
+                '$totalFiles files indexed',
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          if (sorted.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: sorted.take(12).map((e) {
+                final fs = fileStyleFor('file.${e.key}', false);
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: fs.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: fs.color.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(fs.icon, size: 12, color: fs.color),
+                      const SizedBox(width: 5),
+                      Text(
+                        '.${e.key}  ×${e.value}',
+                        style: TextStyle(
+                            fontSize: 11, color: fs.color),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Images list ────────────────────────────────────────────────────────────────
+
+class _ImagesList extends StatelessWidget {
+  final List<dynamic> images;
+
+  const _ImagesList({required this.images});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.image_rounded,
+                  size: 14, color: AppTheme.textMuted),
+              const SizedBox(width: 6),
+              Text(
+                'Images (${images.length})',
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...images.take(10).map((img) {
+            final m = img as Map<String, dynamic>;
+            final name = m['filename'] as String? ?? '';
+            final folder = m['folder'] as String? ?? '';
+            final fs = fileStyleFor(name, false);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Icon(fs.icon, size: 14, color: fs.color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                          color: AppTheme.textPrimary, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    folder,
+                    style: const TextStyle(
+                        color: AppTheme.textMuted, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Empty hint ─────────────────────────────────────────────────────────────────
+
+class _ExploreEmptyHint extends StatelessWidget {
   final void Function(String) onSuggestion;
 
-  const _EmptyHint({required this.onSuggestion});
+  const _ExploreEmptyHint({required this.onSuggestion});
 
   static const _suggestions = [
-    'How does authentication work?',
-    'What are the main API endpoints?',
-    'How is the database structured?',
-    'What env vars are required?',
-    'How do MCP tools get registered?',
-    'Explain the data flow end-to-end',
+    'How many Python files are there?',
+    'List all image assets',
+    'What are the top-level directories?',
+    'How many lines of Dart code?',
+    'Find all config files',
   ];
 
   @override
@@ -357,12 +474,12 @@ class _EmptyHint extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Icon(Icons.auto_awesome_rounded,
-                  size: 34, color: Colors.white),
+              child: const Icon(Icons.manage_search_rounded,
+                  size: 36, color: Colors.white),
             ).animate().scale(duration: 400.ms, curve: Curves.elasticOut),
             const SizedBox(height: 20),
             const Text(
-              'Ask anything about the codebase',
+              'Explore repository structure',
               style: TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 18,
@@ -372,9 +489,8 @@ class _EmptyHint extends StatelessWidget {
             ).animate().fadeIn(delay: 80.ms),
             const SizedBox(height: 6),
             const Text(
-              'Powered by RAG + Groq LLM — answers with source references',
-              style:
-                  TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              'Query file counts, types, structure and assets',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
               textAlign: TextAlign.center,
             ).animate().fadeIn(delay: 120.ms),
             const SizedBox(height: 24),
@@ -396,13 +512,14 @@ class _EmptyHint extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.lightbulb_outline_rounded,
+                        const Icon(Icons.search_rounded,
                             size: 13, color: AppTheme.textMuted),
                         const SizedBox(width: 6),
                         Text(
                           e.value,
                           style: const TextStyle(
-                              color: AppTheme.textSecondary, fontSize: 12),
+                              color: AppTheme.textSecondary,
+                              fontSize: 12),
                         ),
                       ],
                     ),
@@ -422,10 +539,12 @@ class _EmptyHint extends StatelessWidget {
 
 // ── Error view ─────────────────────────────────────────────────────────────────
 
-class _ErrorView extends StatelessWidget {
+class _ExploreErrorView extends StatelessWidget {
   final String error;
+  final VoidCallback onRetry;
 
-  const _ErrorView({required this.error});
+  const _ExploreErrorView(
+      {required this.error, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -450,7 +569,14 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 16),
             Text(error,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary)),
+                style:
+                    const TextStyle(color: AppTheme.textSecondary)),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Try again'),
+            ),
           ],
         ),
       ).animate().fadeIn(),
@@ -458,7 +584,76 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-// ── Chat input bar ─────────────────────────────────────────────────────────────
+// ── Explore avatar ─────────────────────────────────────────────────────────────
+
+class _ExploreAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: AppTheme.aiGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Icons.manage_search_rounded,
+          size: 16, color: Colors.white),
+    );
+  }
+}
+
+// ── Shared chat widgets (local copies) ────────────────────────────────────────
+
+class _QuestionBubble extends StatelessWidget {
+  final String text;
+  const _QuestionBubble({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(4),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+            ),
+            child: Text(text,
+                style: const TextStyle(color: Colors.white, fontSize: 14)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceHigh,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: const Icon(Icons.person_rounded,
+              size: 18, color: AppTheme.textSecondary),
+        ),
+      ],
+    ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.08);
+  }
+}
 
 class _ChatInputBar extends StatelessWidget {
   final TextEditingController ctrl;
@@ -490,8 +685,8 @@ class _ChatInputBar extends StatelessWidget {
               controller: ctrl,
               decoration: InputDecoration(
                 hintText: hintText,
-                hintStyle: const TextStyle(
-                    color: AppTheme.textMuted, fontSize: 14),
+                hintStyle:
+                    const TextStyle(color: AppTheme.textMuted, fontSize: 14),
                 filled: true,
                 fillColor: AppTheme.bg,
                 border: OutlineInputBorder(
@@ -504,8 +699,8 @@ class _ChatInputBar extends StatelessWidget {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: const BorderSide(
-                      color: AppTheme.accent, width: 1.5),
+                  borderSide:
+                      const BorderSide(color: AppTheme.accent, width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 12),
@@ -537,7 +732,7 @@ class _ChatInputBar extends StatelessWidget {
               icon: Icon(
                 isLoading
                     ? Icons.hourglass_top_rounded
-                    : Icons.send_rounded,
+                    : Icons.search_rounded,
                 size: 20,
                 color: isLoading ? AppTheme.textMuted : Colors.white,
               ),
@@ -546,79 +741,6 @@ class _ChatInputBar extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Shared bubble widgets ─────────────────────────────────────────────────────
-
-class _QuestionBubble extends StatelessWidget {
-  final String text;
-
-  const _QuestionBubble({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Flexible(
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(4),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            child: Text(text,
-                style: const TextStyle(color: Colors.white, fontSize: 14)),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceHigh,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: const Icon(Icons.person_rounded,
-              size: 18, color: AppTheme.textSecondary),
-        ),
-      ],
-    ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.08);
-  }
-}
-
-class _AiAvatar extends StatelessWidget {
-  const _AiAvatar();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: AppTheme.aiGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child:
-          const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
     );
   }
 }
