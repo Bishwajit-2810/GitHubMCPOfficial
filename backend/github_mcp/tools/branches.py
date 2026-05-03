@@ -10,7 +10,7 @@ from fastmcp import FastMCP
 
 from ..constants import GITHUB_API
 from ..config import DEFAULT_OWNER, DEFAULT_REPO
-from ..core.github_api import _headers, _raise_for_status
+from ..core.github_api import _headers, _raise_for_status, get_default_branch
 
 
 def register_create_branch_tool(mcp: FastMCP):
@@ -19,7 +19,7 @@ def register_create_branch_tool(mcp: FastMCP):
     @mcp.tool()
     async def create_branch(
         branch: str,
-        source_branch: str = "main",
+        source_branch: Optional[str] = None,
         owner: Optional[str] = None,
         repo: Optional[str] = None,
     ) -> dict:
@@ -28,12 +28,15 @@ def register_create_branch_tool(mcp: FastMCP):
 
         Args:
             branch:        Name of the new branch.
-            source_branch: Branch to copy from (default "main").
+            source_branch: Branch to copy from (defaults to the repo's default branch).
             owner:         Repo owner (defaults to GITHUB_OWNER in .env).
             repo:          Repository name (defaults to GITHUB_REPO in .env).
         """
         owner = owner or DEFAULT_OWNER
         repo = repo or DEFAULT_REPO
+
+        if not source_branch:
+            source_branch = await get_default_branch(owner, repo)
 
         logger.info(f"create_branch | {owner}/{repo} | {source_branch} -> {branch}")
         async with httpx.AsyncClient() as client:

@@ -41,6 +41,9 @@ from github_mcp.config import (
 )
 from github_mcp.tools import register_all_tools
 
+# Validate config eagerly at import time so missing vars fail fast
+validate_config()
+
 # Initialize FastMCP server
 mcp = FastMCP("github-mcp")
 

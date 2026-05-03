@@ -1,0 +1,3 @@
+flutter run -d chrome --web-port 5173
+uv run python api_server.py --port 8091
+uv run python server.py --port 8090

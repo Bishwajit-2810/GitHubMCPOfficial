@@ -10,7 +10,7 @@ from fastmcp import FastMCP
 
 from ..constants import GITHUB_API
 from ..config import DEFAULT_OWNER, DEFAULT_REPO
-from ..core.github_api import _headers, _raise_for_status
+from ..core.github_api import _headers, _raise_for_status, get_default_branch
 
 
 def register_create_pull_request_tool(mcp: FastMCP):
@@ -20,7 +20,7 @@ def register_create_pull_request_tool(mcp: FastMCP):
     async def create_pull_request(
         title: str,
         head: str,
-        base: str = "main",
+        base: Optional[str] = None,
         body: str = "",
         draft: bool = False,
         owner: Optional[str] = None,
@@ -40,6 +40,9 @@ def register_create_pull_request_tool(mcp: FastMCP):
         """
         owner = owner or DEFAULT_OWNER
         repo = repo or DEFAULT_REPO
+
+        if not base:
+            base = await get_default_branch(owner, repo)
 
         logger.info(f"create_pull_request | {owner}/{repo} | {head} -> {base}")
         async with httpx.AsyncClient() as client:

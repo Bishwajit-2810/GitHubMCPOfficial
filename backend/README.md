@@ -1,778 +1,736 @@
-# GitHub MCP Server
+# GitHub MCP — v2
 
-A modular GitHub API server built on [FastMCP](https://github.com/jlowin/fastmcp) — 12 MCP tools for repository management, GitHub Projects v2, and AI-powered codebase Q&A through a RAG pipeline (ChromaDB + Groq).
+A two-server stack for AI-driven GitHub automation:
 
-## 📖 Table of Contents
-
-- [Quick Start](#-quick-start)
-- [Features](#-features)
-- [Project Structure](#-project-structure)
-- [Environment Variables](#-environment-variables)
-- [Setup & Installation](#-setup--installation)
-- [RAG Pipeline](#-rag-pipeline)
-- [Tool Reference](#-tool-reference)
-  - [list_files](#1-list_files)
-  - [create_branch](#2-create_branch)
-  - [create_file](#3-create_file)
-  - [create_pull_request](#4-create_pull_request)
-  - [create_project_task](#5-create_project_task)
-  - [list_project_tasks](#6-list_project_tasks)
-  - [assign_task](#7-assign_task)
-  - [update_task_status](#8-update_task_status)
-  - [create_project_field](#9-create_project_field)
-  - [set_task_fields](#10-set_task_fields)
-  - [ask_codebase](#11-ask_codebase)
-  - [explore_codebase](#12-explore_codebase)
-- [Module Reference](#-module-reference)
-- [Development Guide](#-development-guide)
-- [Documentation](#-documentation)
-- [License](#-license)
+| Server | Port | Purpose |
+|--------|------|---------|
+| **MCP server** (`server.py`) | 8090 | FastMCP SSE — 12 tools consumed directly by Claude / Cursor |
+| **BFF API** (`api_server.py`) | 8091 | FastAPI — Firebase auth, GitHub OAuth, REST wrappers for the same tools |
 
 ---
 
-## ⚡ Quick Start
+## Table of Contents
 
-```bash
-# Clone and install
-git clone <your-repo-url>
-cd GitHubMCP
-
-# Install uv (if needed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Create virtual environment + install deps
-uv venv && source .venv/bin/activate
-uv pip install -e .
-
-# Configure
-cp .env.example .env   # then edit with your credentials
-
-# Index the repo (once)
-uv run python ingest.py
-
-# Start the MCP server
-uv run python server.py --port 8090
-
-# Inspect the server (optional, in a new terminal)
-npx @modelcontextprotocol/inspector
-```
-
-The server starts on `http://localhost:8090/sse`.
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Environment Variables](#environment-variables)
+- [Setup & Installation](#setup--installation)
+- [Running the Servers](#running-the-servers)
+- [Auth Flow (BFF)](#auth-flow-bff)
+- [BFF API Reference](#bff-api-reference)
+- [Running Tests](#running-tests)
+- [Database Migrations](#database-migrations)
+- [RAG Pipeline](#rag-pipeline)
+- [MCP Tool Reference](#mcp-tool-reference)
+- [Project Structure](#project-structure)
+- [Development Guide](#development-guide)
+- [License](#license)
 
 ---
 
-## ✨ Features
-
-| Feature                  | Details                                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------------------- |
-| **12 MCP Tools**         | GitHub repo management + AI-powered codebase Q&A                                                   |
-| **Modular Architecture** | Each tool in its own file for easy maintenance                                                     |
-| **RAG / AI Tools**       | `ask_codebase` and `explore_codebase` via PGVector + Groq                                          |
-| **FastMCP Integration**  | Built on the FastMCP framework (SSE transport)                                                     |
-| **Secure Config**        | Environment-based secrets via dotenv                                                               |
-| **Projects v2 Support**  | Full GitHub Projects v2 API (REST + GraphQL)                                                       |
-| **PGVector default**     | Postgres pgvector is the default store; ChromaDB is the fallback                                   |
-| **Skip local docs**      | `RAG_SKIP_LOCAL_DOCS=true` keeps the index clean when the target repo is unrelated to this project |
-| **Image/Binary Stubs**   | PNG/JPG/PDF etc. indexed as metadata stubs for `explore_codebase`                                  |
-
----
-
-## 📁 Project Structure
+## Architecture
 
 ```
-GitHubMCP/
-├── server.py                   # Main entry point — FastMCP setup + tool registration
-├── server_fallback.py          # Original monolithic backup (1 241 lines)
-├── ingest.py                   # RAG ingestion: GitHub repo + local docs → ChromaDB
-├── rag_query.py                # Standalone RAG chain tester
-├── pyproject.toml              # Dependencies managed by uv
-├── README.md                   # This file
-├── plan.md                     # Project plan & changelog
-├── docs.html                   # Interactive HTML documentation
-├── .env                        # Your credentials (create from .env.example)
-│
-├── chroma_store/               # Persisted ChromaDB vector store (auto-created)
-│
-└── github_mcp/                 # Main Python package
-    ├── __init__.py             # Package init — exports version + config constants
-    ├── config.py               # Load & validate environment variables
-    ├── constants.py            # GitHub API URLs + GraphQL query strings
-    │
-    ├── core/
-    │   ├── __init__.py
-    │   └── github_api.py       # _headers(), _gql_headers(), _raise_for_status(), _gql_check()
-    │
-    ├── utils/
-    │   ├── __init__.py
-    │   └── project_helpers.py  # _resolve_project(), _find_field(), _inline_value()
-    │
-    └── tools/
-        ├── __init__.py         # register_all_tools() — wires all 12 tools to FastMCP
-        ├── files.py            # Tool 1  — list_files
-        ├── branches.py         # Tool 2  — create_branch
-        ├── file_operations.py  # Tool 3  — create_file
-        ├── pull_requests.py    # Tool 4  — create_pull_request
-        ├── tasks.py            # Tool 5  — create_project_task
-        ├── task_list.py        # Tool 6  — list_project_tasks
-        ├── task_assign.py      # Tool 7  — assign_task
-        ├── task_status.py      # Tool 8  — update_task_status
-        ├── project_fields.py   # Tool 9  — create_project_field
-        ├── task_fields.py      # Tool 10 — set_task_fields
-        └── rag_query.py        # Tool 11 + 12 — ask_codebase, explore_codebase
+┌─────────────┐     Firebase ID token     ┌──────────────────────────┐
+│  Frontend   │ ──────────────────────── ▶│  BFF  (port 8091)        │
+│  (Flutter)  │ ◀─────────── JWT ──────── │  FastAPI + slowapi       │
+└─────────────┘                           │  Firebase Auth           │
+                                          │  (Google + email/pass)   │
+                                          │  GitHub OAuth (Fernet)   │
+                                          │  SQLAlchemy + Alembic    │
+                                          └──────────────────────────┘
+
+┌──────────────────┐
+│  Claude / Cursor │ ──── MCP/SSE ────▶  MCP server (port 8090)
+└──────────────────┘                     FastMCP — 12 tools
 ```
 
 ---
 
-## 🔑 Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-# ── Required ────────────────────────────────────────────
-GITHUB_TOKEN=ghp_...          # GitHub Personal Access Token (repo + project scopes)
-GITHUB_OWNER=Bishwajit-2810   # GitHub username or org
-GITHUB_REPO=The_New_York_Times
-PROJECT_ID=2                  # GitHub Projects v2 number from the board URL
-
-# ── AI / RAG ────────────────────────────────────────────
-GROQ_API_KEY=gsk_...          # Free at console.groq.com
-RAG_VECTOR_DB=pgvector        # chroma | pgvector | both  (default: pgvector)
-RAG_SKIP_LOCAL_DOCS=true      # true = only index the target GitHub repo, not local files
-
-# ── PGVector (required when RAG_VECTOR_DB=pgvector or both) ─
-POSTGRES_URL=postgresql://postgres:postgres@localhost:5434/ai_db
-
-# ── ChromaDB (required when RAG_VECTOR_DB=chroma or both) ───
-RAG_CHROMA_DIR=./chroma_store
-```
-
-### GitHub Token Permissions
-
-| Scope      | Purpose                                                  |
-| ---------- | -------------------------------------------------------- |
-| `repo`     | Full repository access (read/write files, branches, PRs) |
-| `project`  | GitHub Projects v2 access                                |
-| `read:org` | Required when _owner_ is an organisation                 |
-
-### Get a free Groq API key
-
-Visit [console.groq.com](https://console.groq.com), create an account, and copy the key to `GROQ_API_KEY`.
-
----
-
-## 🚀 How to Run This System
-
-Follow these steps **in order** every time you set the project up on a new machine, or whenever you want to re-index a different repository.
-
-### Step 0 — Prerequisites
-
-- Python 3.12+
-- [uv](https://github.com/astral-sh/uv) — fast Python package manager
-- Docker (for PGVector) **or** skip and use ChromaDB (`RAG_VECTOR_DB=chroma`)
-
-### Step 1 — Clone & install dependencies
+## Quick Start
 
 ```bash
 git clone <your-repo-url>
-cd GitHubMCP
+cd GitHubMCP/backend
 
 # Install uv (skip if already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create virtual environment
-uv venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+# Create venv and install all dependencies
+uv venv && source .venv/bin/activate
+uv pip install -e .
 
-# Install all Python dependencies
+# Configure environment
+cp .env.example .env   # fill in the values described below
+
+# Run DB migrations (creates users, oauth_connections, etc.)
+alembic upgrade head
+
+# Index the repo for RAG (once)
+uv run python ingest.py
+
+# Terminal 1 — MCP server
+uv run python server.py --port 8090
+
+# Terminal 2 — BFF API
+uv run python api_server.py --port 8091
+```
+
+---
+
+## Environment Variables
+
+Create `.env` in the `backend/` directory.
+
+### GitHub (MCP server + BFF)
+
+```env
+GITHUB_TOKEN=ghp_...          # PAT used by the MCP server (repo + project + read:org)
+GITHUB_OWNER=your-username    # Default owner for MCP tools
+GITHUB_REPO=your-repo         # Default repo for MCP tools
+PROJECT_ID=2                  # GitHub Projects v2 board number
+```
+
+### BFF — Auth
+
+```env
+# Firebase (one of these two is required)
+FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/serviceAccount.json
+FIREBASE_PROJECT_ID=your-firebase-project-id   # uses Application Default Credentials
+
+# JWT signed by the BFF after Firebase login
+JWT_SECRET=change-me-to-a-long-random-string
+JWT_ALGORITHM=HS256           # optional, default HS256
+JWT_EXPIRATION=3600           # optional, default 3600 (seconds)
+
+# Fernet key for encrypting stored GitHub OAuth tokens
+# Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+TOKEN_ENCRYPTION_KEY=your-fernet-key
+```
+
+### BFF — GitHub OAuth App
+
+```env
+GITHUB_CLIENT_ID=Ov23li...
+GITHUB_CLIENT_SECRET=...
+GITHUB_OAUTH_REDIRECT_URI=http://localhost:3000/oauth/callback
+```
+
+### BFF — Server
+
+```env
+API_PORT=8091                 # optional, default 8091
+API_HOST=0.0.0.0              # optional, default 0.0.0.0
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+LOG_LEVEL=INFO                # DEBUG | INFO | WARNING | ERROR
+```
+
+### Database (shared — BFF + optional RAG PGVector)
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/githubmcp
+# PGVector RAG (can be the same DB or a separate one)
+POSTGRES_URL=postgresql://postgres:postgres@localhost:5434/ai_db
+```
+
+### RAG / AI
+
+```env
+GROQ_API_KEY=gsk_...
+RAG_VECTOR_DB=pgvector        # chroma | pgvector | both  (default: pgvector)
+RAG_SKIP_LOCAL_DOCS=true
+RAG_CHROMA_DIR=./chroma_store
+```
+
+### GitHub Token Scopes Required
+
+| Scope | Purpose |
+|-------|---------|
+| `repo` | Read/write files, branches, PRs |
+| `project` | GitHub Projects v2 |
+| `read:org` | Org-owned projects |
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv)
+- Docker (for PostgreSQL) or an existing Postgres 15+ instance
+
+### Step 1 — Clone and install
+
+```bash
+git clone <your-repo-url>
+cd GitHubMCP/backend
+uv venv && source .venv/bin/activate
 uv pip install -e .
 ```
 
-### Step 2 — Configure .env
-
-```bash
-cp .env.example .env
-# Edit .env — fill in GITHUB_TOKEN, GROQ_API_KEY, GITHUB_OWNER, GITHUB_REPO, etc.
-```
-
-Minimum required keys:
-
-```env
-GITHUB_TOKEN=ghp_...
-GITHUB_OWNER=Bishwajit-2810
-GITHUB_REPO=The_New_York_Times
-PROJECT_ID=2
-GROQ_API_KEY=gsk_...
-RAG_VECTOR_DB=pgvector
-POSTGRES_URL=postgresql://postgres:postgres@localhost:5434/ai_db
-RAG_SKIP_LOCAL_DOCS=true
-```
-
-### Step 3 — Start PGVector (skip if using ChromaDB)
+### Step 2 — Start PostgreSQL
 
 ```bash
 docker run -d \
-  --name pgvector-rag \
+  --name githubmcp-pg \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=ai_db \
+  -e POSTGRES_DB=githubmcp \
   -p 5434:5432 \
   pgvector/pgvector:pg16
+
+# Verify
+docker ps | grep githubmcp-pg
 ```
 
-Verify it is running:
+> **SQLite for local dev (no Docker):** Set `DATABASE_URL=sqlite:///./dev.db` in `.env`.  
+> SQLite is also used automatically by the test suite (in-memory).
+
+### Step 3 — Configure `.env`
 
 ```bash
-docker ps | grep pgvector-rag
+cp .env.example .env
+# Edit .env — fill in all required variables
 ```
 
-> **ChromaDB alternative:** Set `RAG_VECTOR_DB=chroma` and skip this step entirely.
+Minimum required to start both servers:
 
-### Step 4 — Index the repository (run once)
+```env
+GITHUB_TOKEN=ghp_...
+GITHUB_OWNER=your-username
+GITHUB_REPO=your-repo
+PROJECT_ID=2
+GROQ_API_KEY=gsk_...
+JWT_SECRET=replace-with-random-secret
+TOKEN_ENCRYPTION_KEY=<output of Fernet.generate_key()>
+FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/serviceAccount.json
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+GITHUB_OAUTH_REDIRECT_URI=http://localhost:3000/oauth/callback
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/githubmcp
+POSTGRES_URL=postgresql://postgres:postgres@localhost:5434/ai_db
+```
+
+### Step 4 — Run database migrations
+
+```bash
+alembic upgrade head
+```
+
+This creates four tables: `users`, `user_context`, `oauth_connections`, `audit_logs`.
+
+### Step 5 — Index the repository (RAG, run once)
 
 ```bash
 uv run python ingest.py
+# Re-index after repo changes:
+uv run python ingest.py --reingest
 ```
 
-This fetches every file from `GITHUB_OWNER/GITHUB_REPO`, splits text into 500-char chunks, embeds them with `sentence-transformers/all-MiniLM-L6-v2`, and loads them into PGVector.
+---
 
-| File type                                               | Action                                  |
-| ------------------------------------------------------- | --------------------------------------- |
-| `.py .md .js .ts .json .toml .yaml .html .css .sh .sql` | Split into chunks and embedded          |
-| `.png .jpg .gif .svg .ico .webp .pdf .zip`              | Stored as metadata stubs (not embedded) |
+## Running the Servers
 
-Expected output:
+### MCP server (port 8090)
 
-```
-INFO  Default branch: 'master'
-INFO  Total files in repo: 42
-INFO  Text files loaded : 28
-INFO  Binary files found: 14
-INFO  Split into 312 chunks
-INFO  PGVector: collection 'github_mcp_docs' stored ✅
-INFO  Indexed 312 text chunks from 28 text files
-INFO  Images found (8): ['logo.png', 'banner.jpg', ...]
-```
-
-Re-index after repo changes:
-
-```bash
-uv run python ingest.py --reingest         # wipe store, then re-index
-uv run python ingest.py --db chroma        # ChromaDB only
-uv run python ingest.py --db pgvector      # PGVector only
-uv run python ingest.py --db both          # both stores
-uv run python ingest.py --docs-only        # local docs only (fast, no GitHub API call)
-```
-
-### Step 5 — (Optional) Test the RAG chain
-
-```bash
-# Run 3 built-in test questions
-uv run python rag_query.py
-
-# Ask a custom question
-uv run python rag_query.py "Tell me about this project"
-```
-
-### Step 6 — Start the MCP server
+Used directly by Claude Desktop, Cursor, or any MCP client.
 
 ```bash
 uv run python server.py --port 8090
+# or with uvicorn
+uvicorn server:app --host 0.0.0.0 --port 8090
 ```
 
-The server listens at **<http://localhost:8090/sse>** and exposes all 12 tools over the MCP / SSE protocol.
+SSE endpoint: `http://localhost:8090/sse`
 
-### Step 7 — (Optional) Inspect the MCP server
-
-In a new terminal, use the MCP Inspector to test the tools interactively:
-
+Inspect tools interactively:
 ```bash
 npx @modelcontextprotocol/inspector
 ```
 
-Then select the server running on port 8090 and interact with the tools in a browser-based UI.
+### BFF API (port 8091)
 
-### Switching vector stores without re-indexing
+Used by the frontend / external clients.
 
-Change `RAG_VECTOR_DB` in `.env` and restart the server — no code changes needed:
+```bash
+uv run python api_server.py --port 8091
+# or
+uvicorn api_server:app --host 0.0.0.0 --port 8091 --reload
+```
 
-| `RAG_VECTOR_DB` | Behaviour                                           |
-| --------------- | --------------------------------------------------- |
-| `pgvector`      | PGVector only (default, recommended)                |
-| `chroma`        | ChromaDB only                                       |
-| `both`          | Combined search (ChromaDB + PGVector, deduplicated) |
+Interactive docs: `http://localhost:8091/docs`  
+OpenAPI schema: `http://localhost:8091/openapi.json`
 
 ---
 
-## 🤖 RAG Pipeline
+## Auth Flow (BFF)
 
-The RAG pipeline indexes the remote GitHub repository into a vector store (PGVector by default), then powers the `ask_codebase` and `explore_codebase` tools.
+Google and email/password sign-in go through Firebase — the app gets a Firebase ID token and the BFF verifies it the same way for both. GitHub is **not** a sign-in method; it is only used post-login via the Connect GitHub flow to grant `repo`, `read:org`, and `project` scopes for tool access.
 
-### Install RAG dependencies
-
-```bash
-uv add langchain langchain-community langchain-chroma langchain-huggingface \
-       langchain-groq langchain-text-splitters langchain-postgres \
-       chromadb sentence-transformers pgvector psycopg2-binary
+```text
+1. User signs in via Firebase (Google or email/password) → Firebase returns ID token
+2. POST /api/v1/auth/firebase-login  { id_token }
+   → BFF verifies with Firebase Admin SDK, upserts user, returns a signed JWT
+3. Frontend stores the JWT and sends it as: Authorization: Bearer <jwt>
+4. User clicks "Connect GitHub" → GitHub OAuth redirect
+5. POST /api/v1/auth/connect-github  { code }
+   → BFF exchanges code for GitHub access token, encrypts it (Fernet), stores in DB
+6. All /api/v1/tools/* calls now use the stored GitHub token automatically
 ```
 
 ---
 
-## 🛠 Tool Reference
+## BFF API Reference
+
+All tool routes require `Authorization: Bearer <jwt>` and a connected GitHub account.  
+Base URL: `http://localhost:8091`
+
+### Health
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health` | None | Liveness probe — `{"status":"ok"}` |
+| GET | `/ready` | None | Readiness probe — checks DB connectivity |
+
+### Auth
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/auth/firebase-login` | None | Verify Firebase token (Google or email/password), return JWT |
+| POST | `/api/v1/auth/connect-github` | JWT | Exchange GitHub OAuth code, store encrypted token |
+| GET | `/api/v1/auth/context` | JWT | Get selected owner/repo/project |
+| POST | `/api/v1/auth/context` | JWT | Set default owner/repo/project (used as fallback by all tools) |
+
+**`POST /api/v1/auth/firebase-login`**
+```json
+// Request
+{ "id_token": "eyJhbGci..." }
+
+// Response
+{ "access_token": "eyJ...", "token_type": "bearer", "user_id": 1, "firebase_uid": "abc123" }
+```
+
+**`POST /api/v1/auth/connect-github`**
+```json
+// Request
+{ "code": "github_oauth_code_here" }
+
+// Response
+{ "connected": true, "scopes": ["project", "read:org", "repo"] }
+```
+
+**`POST /api/v1/auth/context`**
+```json
+// Request
+{ "selected_owner": "my-org", "selected_repo": "my-repo", "selected_project_number": 3 }
+
+// Response
+{ "selected_owner": "my-org", "selected_repo": "my-repo", "selected_project_number": 3 }
+```
+
+### Tools
+
+All tool routes: `POST /api/v1/tools/<tool-name>`  
+`owner` and `repo` fields are optional — they fall back to the context set via `/api/v1/auth/context`.
+
+| Endpoint | Required scopes | Description |
+|----------|----------------|-------------|
+| `/api/v1/tools/list-files` | `repo` | Browse repo files |
+| `/api/v1/tools/create-branch` | `repo` (write) | Create a branch |
+| `/api/v1/tools/create-file` | `repo` (write) | Create or update a file |
+| `/api/v1/tools/create-pull-request` | `repo` (write) | Open a PR |
+| `/api/v1/tools/create-task` | `project` | Create project task / issue |
+| `/api/v1/tools/list-tasks` | `project` | List project board items |
+| `/api/v1/tools/assign-task` | `repo` (write) | Assign users & labels to an issue |
+| `/api/v1/tools/update-task-status` | `project` | Move item to a new status column |
+| `/api/v1/tools/ask-codebase` | JWT only | RAG Q&A over indexed repo |
+
+**Error envelope** (all errors):
+```json
+{
+  "error": {
+    "code": "MISSING_CONTEXT",
+    "message": "Missing required field(s): owner. Set them via POST /api/v1/auth/context.",
+    "details": null
+  }
+}
+```
+
+---
+
+## Running Tests
+
+The test suite uses an in-memory SQLite database (StaticPool) and mocks Firebase + GitHub HTTP calls — no external services needed.
+
+```bash
+cd backend
+
+# Run all 34 tests
+.venv/bin/pytest tests/ -v
+
+# Run a specific file
+.venv/bin/pytest tests/test_auth.py -v
+
+# Run with log output
+.venv/bin/pytest tests/ -v -s
+
+# Run with coverage (if pytest-cov installed)
+.venv/bin/pytest tests/ --cov=github_mcp/api --cov-report=term-missing
+```
+
+Expected output:
+```
+tests/test_auth.py::test_firebase_login_success PASSED
+tests/test_auth.py::test_firebase_login_invalid_token PASSED
+tests/test_auth.py::test_connect_github_success PASSED
+... (34 total)
+============================== 34 passed in 0.63s ==============================
+```
+
+### Test files
+
+| File | What it tests |
+|------|---------------|
+| `tests/test_health.py` | `/health`, `/ready`, DB failure path |
+| `tests/test_auth.py` | Firebase login, GitHub OAuth, context CRUD, JWT rejection |
+| `tests/test_core.py` | Fernet crypto, JWT sign/verify, `_headers()`, `_raise_for_status()` |
+| `tests/test_tools.py` | Auth gates, scope enforcement, `list_files` happy path, RAG config check |
+
+### Test configuration
+
+`pyproject.toml` sets `asyncio_mode = "strict"` and the `testpaths`. The `conftest.py` fixture:
+
+- Creates an in-memory SQLite DB with `StaticPool` (all connections share one DB)
+- Overrides `get_db_dep` and `get_current_user` so tests don't need real credentials
+- Uses `uuid.uuid4()` per test to avoid `UNIQUE` constraint collisions on `firebase_uid`
+
+---
+
+## Database Migrations
+
+Migrations live in `alembic/versions/`. Alembic is configured in `alembic.ini` and reads `DATABASE_URL` from the environment.
+
+```bash
+# Apply all pending migrations
+alembic upgrade head
+
+# Roll back one migration
+alembic downgrade -1
+
+# Check current revision
+alembic current
+
+# Generate a new migration after model changes
+alembic revision --autogenerate -m "add_column_xyz"
+```
+
+Migrations in `alembic/versions/`:
+
+| Migration                          | Purpose                                                             |
+|------------------------------------|---------------------------------------------------------------------|
+| `001_initial_schema.py`            | Creates `users`, `user_context`, `oauth_connections`, `audit_logs`  |
+| `003_revert_username_password.py`  | Removes unused `username`/`password_hash` columns (if 002 ran)      |
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Firebase UID or username → internal user ID |
+| `user_context` | Per-user default owner/repo/project |
+| `oauth_connections` | Encrypted GitHub access tokens |
+| `audit_logs` | Action history (login, register, connect, etc.) |
+
+---
+
+## RAG Pipeline
+
+The RAG pipeline indexes the target GitHub repository into a vector store (PGVector by default) and powers the `ask_codebase` tool.
+
+### Index the repository
+
+```bash
+uv run python ingest.py                  # full index → PGVector (default)
+uv run python ingest.py --reingest       # wipe store, then re-index
+uv run python ingest.py --db chroma      # ChromaDB only
+uv run python ingest.py --db pgvector    # PGVector only
+uv run python ingest.py --db both        # both stores
+uv run python ingest.py --docs-only      # local docs only (fast)
+```
+
+### Test the RAG chain
+
+```bash
+uv run python rag_query.py                          # 3 built-in test questions
+uv run python rag_query.py "How does auth work?"    # custom question
+```
+
+### Vector store options
+
+| `RAG_VECTOR_DB` | Behaviour |
+|-----------------|-----------|
+| `pgvector` | PGVector only (default, recommended) |
+| `chroma` | ChromaDB only (no Docker needed) |
+| `both` | Combined search, deduplicated results |
+
+---
+
+## MCP Tool Reference
+
+All 12 tools are available on the MCP server at `http://localhost:8090/sse` and as HTTP endpoints at `http://localhost:8091/api/v1/tools/`.
 
 ### 1. `list_files`
+Browse files and directories in a repository.
 
-> **File:** `github_mcp/tools/files.py`
-
-Browse files and directories inside a GitHub repository.
-
-| Parameter | Type  | Default        | Description                         |
-| --------- | ----- | -------------- | ----------------------------------- |
-| `path`    | `str` | `""`           | Path inside the repo (empty = root) |
-| `ref`     | `str` | default branch | Branch / tag / SHA to read from     |
-| `owner`   | `str` | `GITHUB_OWNER` | Repo owner                          |
-| `repo`    | `str` | `GITHUB_REPO`  | Repository name                     |
-
-**Returns:** `{ repo, path, count, items: [{name, type, size, sha, html_url, download_url}] }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `str` | `""` | Path inside the repo (empty = root) |
+| `ref` | `str` | default branch | Branch / tag / SHA |
+| `owner` | `str` | `GITHUB_OWNER` | Repo owner |
+| `repo` | `str` | `GITHUB_REPO` | Repository name |
 
 ---
 
 ### 2. `create_branch`
-
-> **File:** `github_mcp/tools/branches.py`
-
 Create a new branch from an existing branch.
 
-| Parameter       | Type  | Default        | Description         |
-| --------------- | ----- | -------------- | ------------------- |
-| `branch`        | `str` | —              | New branch name     |
-| `source_branch` | `str` | `"main"`       | Branch to copy from |
-| `owner`         | `str` | `GITHUB_OWNER` | Repo owner          |
-| `repo`          | `str` | `GITHUB_REPO`  | Repository name     |
-
-**Returns:** `{ repo, branch, source, sha, ref, url }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `branch` | `str` | — | New branch name |
+| `source_branch` | `str` | repo default branch | Branch to copy from |
+| `owner` | `str` | `GITHUB_OWNER` | Repo owner |
+| `repo` | `str` | `GITHUB_REPO` | Repository name |
 
 ---
 
 ### 3. `create_file`
+Create or update a file with an automatic commit.
 
-> **File:** `github_mcp/tools/file_operations.py`
-
-Create or update a file in a repository with an automatic commit.
-
-| Parameter        | Type  | Default        | Description                                 |
-| ---------------- | ----- | -------------- | ------------------------------------------- |
-| `file_path`      | `str` | —              | Path inside the repo, e.g. `"src/hello.py"` |
-| `content`        | `str` | —              | Plain-text file content                     |
-| `commit_message` | `str` | —              | Git commit message                          |
-| `branch`         | `str` | `"main"`       | Target branch                               |
-| `owner`          | `str` | `GITHUB_OWNER` | Repo owner                                  |
-| `repo`           | `str` | `GITHUB_REPO`  | Repository name                             |
-
-**Returns:** `{ repo, action, file_path, branch, commit_sha, commit_url, blob_url }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `str` | — | File path inside the repo |
+| `content` | `str` | — | Plain-text file content |
+| `message` | `str` | — | Commit message |
+| `branch` | `str` | default branch | Target branch |
+| `owner` | `str` | `GITHUB_OWNER` | Repo owner |
+| `repo` | `str` | `GITHUB_REPO` | Repository name |
 
 ---
 
 ### 4. `create_pull_request`
+Open a pull request.
 
-> **File:** `github_mcp/tools/pull_requests.py`
-
-Open a pull request on GitHub.
-
-| Parameter | Type   | Default        | Description                         |
-| --------- | ------ | -------------- | ----------------------------------- |
-| `title`   | `str`  | —              | PR title                            |
-| `head`    | `str`  | —              | Source branch (with your changes)   |
-| `base`    | `str`  | `"main"`       | Target branch to merge into         |
-| `body`    | `str`  | `""`           | PR description (Markdown supported) |
-| `draft`   | `bool` | `False`        | Open as a draft PR                  |
-| `owner`   | `str`  | `GITHUB_OWNER` | Repo owner                          |
-| `repo`    | `str`  | `GITHUB_REPO`  | Repository name                     |
-
-**Returns:** `{ repo, number, title, state, draft, html_url, head, base, created_at }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `title` | `str` | — | PR title |
+| `head` | `str` | — | Source branch |
+| `base` | `str` | repo default branch | Target branch |
+| `body` | `str` | `""` | PR description |
+| `draft` | `bool` | `false` | Open as draft |
+| `owner` | `str` | `GITHUB_OWNER` | Repo owner |
+| `repo` | `str` | `GITHUB_REPO` | Repository name |
 
 ---
 
 ### 5. `create_project_task`
+Create a task on a GitHub Projects v2 board. Creates a real Issue (if `repo` set) or a draft card.
 
-> **File:** `github_mcp/tools/tasks.py`
-
-Create a task on a GitHub Projects v2 board. Creates a real Issue (if `repo` is set) or a draft card. Optionally sets the Status column immediately.
-
-| Parameter        | Type  | Default        | Description                                             |
-| ---------------- | ----- | -------------- | ------------------------------------------------------- |
-| `title`          | `str` | —              | Task title                                              |
-| `body`           | `str` | `""`           | Description (Markdown supported)                        |
-| `status`         | `str` | `None`         | Status column, e.g. `"Todo"`, `"In Progress"`, `"Done"` |
-| `project_number` | `int` | `PROJECT_ID`   | Project number from the board URL                       |
-| `repo`           | `str` | `GITHUB_REPO`  | Repo name — if given, creates a real Issue              |
-| `owner`          | `str` | `GITHUB_OWNER` | Repo / project owner                                    |
-| `assignee`       | `str` | `None`         | GitHub username to assign                               |
-| `label`          | `str` | `None`         | Label name (auto-created if missing)                    |
-
-**Returns:** `{ project_title, project_id, item_id, title, status, type, issue_url?, issue_number? }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `title` | `str` | — | Task title |
+| `body` | `str` | `""` | Description |
+| `status` | `str` | `None` | Status column, e.g. `"Todo"`, `"In Progress"` |
+| `project_number` | `int` | `PROJECT_ID` | Board number from URL |
+| `repo` | `str` | `GITHUB_REPO` | Creates a real Issue if set |
+| `owner` | `str` | `GITHUB_OWNER` | Owner |
+| `assignee` | `str` | `None` | GitHub username |
+| `label` | `str` | `None` | Label (auto-created if missing) |
 
 ---
 
 ### 6. `list_project_tasks`
+List items on a Projects v2 board with offset pagination.
 
-> **File:** `github_mcp/tools/task_list.py`
-
-List items on a GitHub Projects v2 board with offset pagination. Returns title, type, status, all custom fields, assignees, labels, URLs.
-
-| Parameter        | Type  | Default        | Description                                 |
-| ---------------- | ----- | -------------- | ------------------------------------------- |
-| `project_number` | `int` | `PROJECT_ID`   | Project number                              |
-| `owner`          | `str` | `GITHUB_OWNER` | Project owner (user or org — auto-detected) |
-| `offset`         | `int` | `0`            | 0-based index of the first item             |
-| `limit`          | `int` | `50`           | Number of items to return                   |
-
-**Returns:** `{ project_title, project_id, total_count, offset, limit, items, custom_field_names }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `project_number` | `int` | `PROJECT_ID` | Board number |
+| `owner` | `str` | `GITHUB_OWNER` | Owner (user or org — auto-detected) |
+| `offset` | `int` | `0` | 0-based first item |
+| `limit` | `int` | `50` | Items to return |
 
 ---
 
 ### 7. `assign_task`
-
-> **File:** `github_mcp/tools/task_assign.py`
-
 Assign users and labels to a GitHub Issue. Missing labels are auto-created.
 
-| Parameter      | Type        | Default        | Description                            |
-| -------------- | ----------- | -------------- | -------------------------------------- |
-| `issue_number` | `int`       | —              | Issue number from the URL              |
-| `assignees`    | `list[str]` | —              | GitHub usernames (`[]` to clear)       |
-| `labels`       | `list[str]` | `None`         | Labels to apply (merged with existing) |
-| `repo`         | `str`       | `GITHUB_REPO`  | Repository name                        |
-| `owner`        | `str`       | `GITHUB_OWNER` | Repo owner                             |
-
-**Returns:** `{ repo, issue_number, title, state, html_url, assignees, labels, updated_at }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `issue_number` | `int` | — | Issue number from URL |
+| `assignees` | `list[str]` | — | GitHub usernames |
+| `labels` | `list[str]` | `None` | Labels to apply |
+| `owner` | `str` | `GITHUB_OWNER` | Repo owner |
+| `repo` | `str` | `GITHUB_REPO` | Repository name |
 
 ---
 
 ### 8. `update_task_status`
+Move a project item to a different status column.
 
-> **File:** `github_mcp/tools/task_status.py`
+> `item_id` must come from `list_project_tasks` — starts with `PVTI_`.
 
-Move an existing project item between Status columns on the board.
-
-> **Important:** `item_id` must come from `list_project_tasks` — it starts with `PVTI_`.
-
-| Parameter        | Type  | Default        | Description                                          |
-| ---------------- | ----- | -------------- | ---------------------------------------------------- |
-| `item_id`        | `str` | —              | **Mandatory.** From `list_project_tasks`             |
-| `status`         | `str` | —              | New status, e.g. `"Todo"`, `"In Progress"`, `"Done"` |
-| `project_number` | `int` | `PROJECT_ID`   | Project number                                       |
-| `owner`          | `str` | `GITHUB_OWNER` | Project owner                                        |
-
-**Returns:** `{ item_id, status_updated, project_id }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `item_id` | `str` | — | From `list_project_tasks` |
+| `status` | `str` | — | New status name |
+| `project_number` | `int` | `PROJECT_ID` | Board number |
+| `owner` | `str` | `GITHUB_OWNER` | Owner |
 
 ---
 
 ### 9. `create_project_field`
+Add a custom field to a Projects v2 board. Idempotent.
 
-> **File:** `github_mcp/tools/project_fields.py`
-
-Add a custom field to a GitHub Projects v2 board. Idempotent — returns existing data if the field name already exists.
-
-| Parameter        | Type  | Default        | Description                                              |
-| ---------------- | ----- | -------------- | -------------------------------------------------------- |
-| `field_name`     | `str` | —              | Display name, e.g. `"Story Points"`, `"Due Date"`        |
-| `field_type`     | `str` | —              | One of `"text"`, `"number"`, `"date"` (case-insensitive) |
-| `project_number` | `int` | `PROJECT_ID`   | Project number                                           |
-| `owner`          | `str` | `GITHUB_OWNER` | Project owner                                            |
-
-**Returns:** `{ project_id, field_id, field_name, field_type, already_existed }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `field_name` | `str` | — | Display name, e.g. `"Story Points"` |
+| `field_type` | `str` | — | `"text"`, `"number"`, or `"date"` |
+| `project_number` | `int` | `PROJECT_ID` | Board number |
+| `owner` | `str` | `GITHUB_OWNER` | Owner |
 
 ---
 
 ### 10. `set_task_fields`
+Set one or more custom field values on a project item in one call.
 
-> **File:** `github_mcp/tools/task_fields.py`
-
-Set one or more custom field values on a project item in one call. Validates all field names before any update is applied.
-
-> **Important:** Call `list_project_tasks` first to get the correct `item_id` and `custom_field_names`.
-
-Value formats: `"YYYY-MM-DD"` for dates, `int/float` for numbers, `str` for text.
-
-| Parameter        | Type   | Default        | Description                                                    |
-| ---------------- | ------ | -------------- | -------------------------------------------------------------- |
-| `item_id`        | `str`  | —              | **Mandatory.** From `list_project_tasks` — starts with `PVTI_` |
-| `fields`         | `dict` | —              | `{ field_name: value }` — names must match project exactly     |
-| `project_number` | `int`  | `PROJECT_ID`   | Project number                                                 |
-| `owner`          | `str`  | `GITHUB_OWNER` | Project owner                                                  |
-
-**Example:**
-
-```python
-set_task_fields(
-    item_id="PVTI_lADOBqfXXs4AbcDE",
-    fields={
-        "Start Date":   "2026-03-01",
-        "End Date":     "2026-03-31",
-        "Story Points": 8
-    }
-)
-```
-
-**Returns:** `{ item_id, project_id, fields_set, available_field_names }`
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `item_id` | `str` | — | From `list_project_tasks` |
+| `fields` | `dict` | — | `{ field_name: value }` |
+| `project_number` | `int` | `PROJECT_ID` | Board number |
+| `owner` | `str` | `GITHUB_OWNER` | Owner |
 
 ---
 
 ### 11. `ask_codebase`
+Natural-language Q&A over the indexed repository (RAG).
 
-> **File:** `github_mcp/tools/rag_query.py`  
-> **Requires:** `ingest.py` run first.
-
-Ask a natural-language question about the codebase. Uses RAG (ChromaDB + Groq `openai/gpt-oss-120b`) to return a grounded answer with source-file citations.
-
-| Parameter  | Type  | Description                     |
-| ---------- | ----- | ------------------------------- |
+| Parameter | Type | Description |
+|-----------|------|-------------|
 | `question` | `str` | Any question about the codebase |
 
-**Example questions:**
-
-```
-ask_codebase("How do I add a new MCP tool?")
-ask_codebase("What environment variables are required?")
-ask_codebase("How does GitHub API authentication work?")
-```
-
-**Returns:**
-
-```json
-{
-  "answer": "To add a new tool, define an async function and decorate it with @mcp.tool() [server.py]...",
-  "question": "How do I add a new MCP tool?",
-  "model": "openai/gpt-oss-120b",
-  "sources": ["rag_query.py", "server.py"]
-}
-```
+Requires `ingest.py` to have been run first.
 
 ---
 
 ### 12. `explore_codebase`
+Explore repository structure — find files, list images, count by type.
 
-> **File:** `github_mcp/tools/rag_query.py`  
-> **Requires:** `ingest.py` run first.
-
-Explore the repository structure — find files, list images, read file contents, count files by type.
-
-| Parameter | Type  | Description                         |
-| --------- | ----- | ----------------------------------- |
-| `query`   | `str` | A structural or file-level question |
-
-**Example queries:**
-
-```
-explore_codebase("Are there any image files?")
-explore_codebase("How many Python files are there?")
-explore_codebase("Show me the contents of server.py")
-explore_codebase("List all .md files")
-explore_codebase("What files are in the tools folder?")
-explore_codebase("Find all files with 'config' in the name")
-explore_codebase("What file types exist in this repo?")
-```
-
-**Returns:**
-
-```json
-{
-  "answer": "There are 8 image files: logo.png, banner.jpg...",
-  "matched_files": ["logo.png", "banner.jpg"],
-  "file_summary": { ".py": 12, ".md": 3, ".png": 5, ".jpg": 3 },
-  "total_files": 42,
-  "images": [{ "filename": "logo.png", "folder": "assets", "url": "..." }],
-  "query": "Are there any image files?"
-}
-```
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | `str` | Structural or file-level question |
 
 ---
 
-## 📦 Module Reference
+## Project Structure
 
-### `server.py` — Main Entry Point
-
-Initialises `FastMCP("github-mcp")`, calls `register_all_tools(mcp)` to wire all 12 tools, and starts the SSE server.
-
-```bash
-python server.py [--port PORT] [--host HOST]
 ```
-
----
-
-### `ingest.py` — RAG Ingestion
-
-Fetches every file from the target GitHub repo, splits text, embeds, and loads into PGVector (default) and/or ChromaDB.
-
-| Function                            | Returns                    | Description                                                                                |
-| ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------ |
-| `_gh_headers()`                     | `dict`                     | GitHub REST API auth headers                                                               |
-| `_get_default_branch()`             | `str`                      | Fetch default branch; falls back to `"main"`                                               |
-| `_get_all_repo_files(branch)`       | `list[dict]`               | Full recursive file tree via GitHub Git Trees API                                          |
-| `_fetch_file_content(path, branch)` | `str \| None`              | Download raw file content from GitHub                                                      |
-| `_strip_html(html)`                 | `str`                      | Strip HTML tags, decode entities, return plain text                                        |
-| `_ext(path)`                        | `str`                      | Lowercase extension with dot (e.g. `.py`), or `""`                                         |
-| `load_repo_documents(branch)`       | `(text_docs, binary_docs)` | Load all repo files; returns text chunks + binary stubs                                    |
-| `load_local_docs()`                 | `list[Document]`           | Walk project root for `.html .md .txt .rst` docs (skipped when `RAG_SKIP_LOCAL_DOCS=true`) |
-| `split_docs(docs)`                  | `list[Document]`           | 500-char chunks, 50-char overlap                                                           |
-| `get_embeddings()`                  | `HuggingFaceEmbeddings`    | Load `sentence-transformers/all-MiniLM-L6-v2`                                              |
-| `ingest_chroma(docs, emb)`          | `int`                      | Embed + persist to ChromaDB; returns stored doc count                                      |
-| `ingest_pgvector(docs, emb)`        | `None`                     | Embed + persist to PGVector (requires `POSTGRES_URL`)                                      |
-| `main()`                            | `None`                     | CLI entry point — `--db`, `--reingest`, `--docs-only` flags                                |
-
-Key env vars consumed:
-
-| Variable              | Default          | Description                              |
-| --------------------- | ---------------- | ---------------------------------------- |
-| `RAG_VECTOR_DB`       | `pgvector`       | `chroma \| pgvector \| both`             |
-| `RAG_SKIP_LOCAL_DOCS` | `false`          | `true` = skip local project doc indexing |
-| `POSTGRES_URL`        | —                | Required for PGVector                    |
-| `RAG_CHROMA_DIR`      | `./chroma_store` | ChromaDB persistence directory           |
-
-```bash
-python ingest.py                    # full index → PGVector (default)
-python ingest.py --reingest         # wipe & re-index
-python ingest.py --db both          # PGVector + ChromaDB
-python ingest.py --docs-only        # local docs only (fast)
+backend/
+├── api_server.py              # FastAPI BFF entry point (port 8091)
+├── server.py                  # FastMCP MCP server entry point (port 8090)
+├── ingest.py                  # RAG ingestion script
+├── rag_query.py               # Standalone RAG chain tester
+├── pyproject.toml             # All dependencies (uv)
+├── alembic.ini                # Alembic config
+├── bug.md                     # Bug audit from v2 upgrade
+│
+├── alembic/
+│   └── versions/
+│       └── 001_initial_schema.py   # Creates all 4 BFF tables
+│
+├── tests/
+│   ├── conftest.py            # In-memory SQLite fixtures, mock auth
+│   ├── test_health.py         # Health + readiness probes
+│   ├── test_auth.py           # Firebase login, OAuth connect, context, JWT
+│   ├── test_core.py           # Crypto, JWT, GitHub API helpers
+│   └── test_tools.py          # Tool route auth gates + happy paths
+│
+└── github_mcp/
+    ├── config.py              # Env var loading + validate_config()
+    ├── constants.py           # API URLs, GraphQL strings
+    ├── core/
+    │   └── github_api.py      # _headers(), _gql_headers(), get_default_branch()
+    ├── utils/
+    │   └── project_helpers.py # _resolve_project(), _find_field()
+    ├── tools/                 # One file per MCP tool (12 total)
+    └── api/                   # BFF package
+        ├── auth.py            # JWT create/decode (python-jose)
+        ├── crypto.py          # Fernet encrypt/decrypt for OAuth tokens
+        ├── db.py              # SQLAlchemy engine + get_db_dep
+        ├── dependencies.py    # get_current_user, require_repo_read/write/project
+        ├── exceptions.py      # AppError, AuthError, ForbiddenError + handlers
+        ├── firebase_auth.py   # Lazy Firebase Admin init + verify_firebase_token()
+        ├── models.py          # ORM: User, UserContext, OAuthConnection, AuditLog
+        └── routes/
+            ├── auth_routes.py # /auth/* endpoints
+            ├── health.py      # /health, /ready
+            └── tool_routes.py # /tools/* endpoints
 ```
 
 ---
 
-### `rag_query.py` — Standalone RAG Tester
+## Development Guide
 
-LCEL RAG chain tester. Verifies the vector store and Groq key independently of the MCP server.
-
-| Function                        | Returns         | Description                                                       |
-| ------------------------------- | --------------- | ----------------------------------------------------------------- |
-| `_load_retriever(embeddings)`   | `BaseRetriever` | Build retriever based on `RAG_VECTOR_DB` (sync-safe for PGVector) |
-| `_format_docs(docs)`            | `str`           | Format retrieved docs with `[filename]` headers                   |
-| `build_chain()`                 | `chain`         | LCEL: retriever → format_docs → prompt → Groq LLM → parser        |
-| `run_question(chain, question)` | `str`           | Invoke chain, print Q&A, return answer                            |
-| `main()`                        | `None`          | CLI: built-in test questions or custom question from argv         |
-
-```bash
-python rag_query.py                           # 3 built-in test questions
-python rag_query.py "Tell me about the project"   # custom question
-```
-
----
-
-### `github_mcp/config.py`
-
-| Symbol              | Type  | Source                                             |
-| ------------------- | ----- | -------------------------------------------------- |
-| `GITHUB_TOKEN`      | `str` | `GITHUB_TOKEN` env var                             |
-| `DEFAULT_OWNER`     | `str` | `GITHUB_OWNER` env var                             |
-| `DEFAULT_REPO`      | `str` | `GITHUB_REPO` env var                              |
-| `DEFAULT_PROJECT`   | `int` | `PROJECT_ID` env var                               |
-| `validate_config()` | —     | Raises `RuntimeError` if `GITHUB_TOKEN` is missing |
-
----
-
-### `github_mcp/constants.py`
-
-| Symbol               | Description                                                  |
-| -------------------- | ------------------------------------------------------------ |
-| `GITHUB_API`         | `https://api.github.com`                                     |
-| `GRAPHQL_URL`        | `https://api.github.com/graphql`                             |
-| `PAGE_SIZE`          | `100` — max items per GraphQL page                           |
-| `USER_PROJECT_QUERY` | GraphQL query for user-owned projects                        |
-| `ORG_PROJECT_QUERY`  | GraphQL query for org-owned projects                         |
-| `BUILTIN_FIELDS`     | Set of built-in field names to skip in custom-field listings |
-
----
-
-### `github_mcp/core/github_api.py`
-
-| Function                  | Returns | Description                                                       |
-| ------------------------- | ------- | ----------------------------------------------------------------- |
-| `_headers()`              | `dict`  | REST API headers — `Authorization: Bearer`, `Accept`, API version |
-| `_gql_headers()`          | `dict`  | GraphQL headers — adds `Content-Type: application/json`           |
-| `_raise_for_status(resp)` | `None`  | Raise `RuntimeError` on HTTP 4xx/5xx with JSON detail             |
-| `_gql_check(resp)`        | `dict`  | Raise on HTTP error AND on GraphQL `errors`; return parsed JSON   |
-
----
-
-### `github_mcp/utils/project_helpers.py`
-
-| Function                                          | Returns | Description                                                |
-| ------------------------------------------------- | ------- | ---------------------------------------------------------- |
-| `_resolve_project(client, owner, project_number)` | `dict`  | Try user then org query; return `projectV2` node           |
-| `_find_field(proj, name)`                         | `dict`  | Find field node by name (case-insensitive)                 |
-| `_inline_value(data_type, value)`                 | `str`   | Build inline `{ date/number/text: ... }` block for GraphQL |
-
----
-
-## 🔧 Development Guide
-
-### Adding a New Tool
+### Adding a new MCP tool
 
 1. Create `github_mcp/tools/your_tool.py`:
 
 ```python
-"""your_tool — one-line summary.
-
-Longer description of what this module does.
-"""
-
 from typing import Optional
 from fastmcp import FastMCP
 from ..core.github_api import _headers
 
 def register_your_tool(mcp: FastMCP) -> None:
-    """Register the your_tool tool with the FastMCP server."""
-
     @mcp.tool()
     async def your_tool(param: str, owner: Optional[str] = None) -> dict:
-        """Short description shown to the LLM agent.
-
-        Longer explanation of behaviour and edge cases.
-
-        Args:
-            param: What this parameter does.
-            owner: Repo owner (defaults to GITHUB_OWNER in .env).
-
-        Returns:
-            result: Description of the return value.
-        """
+        """Short description shown to the LLM agent."""
         return {"result": "success"}
 ```
 
-1. Register in `github_mcp/tools/__init__.py`:
+2. Register in `github_mcp/tools/__init__.py`:
 
 ```python
 from .your_tool import register_your_tool
 
 def register_all_tools(mcp):
-    # ... existing tools ...
+    # ...existing...
     register_your_tool(mcp)
 ```
 
-1. Done — the tool is immediately available over SSE.
+### Adding a new BFF route
+
+1. Add the route to `github_mcp/api/routes/tool_routes.py` following the existing pattern.
+2. Use `_require_owner_repo()` if your route needs `owner`/`repo`.
+3. Use the appropriate dependency: `require_repo_read`, `require_repo_write`, or `require_project_scope`.
+
+### CI
+
+`.github/workflows/backend-ci.yml` runs on every push:
+- Starts a Postgres 15 service
+- `uv sync`
+- `pytest tests/ -v`
 
 ---
 
-## 📚 Documentation
-
-| Resource                 | Location                                                               |
-| ------------------------ | ---------------------------------------------------------------------- |
-| Interactive HTML docs    | Open `docs.html` in a browser                                          |
-| Tool docstrings          | `github_mcp/tools/*.py` — each `@mcp.tool()` function                  |
-| Module docstrings        | Top of every `.py` file                                                |
-| Helper docstrings        | `github_mcp/core/github_api.py`, `github_mcp/utils/project_helpers.py` |
-| Project plan & changelog | `plan.md`                                                              |
-
----
-
-## 📄 License
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
 ### Credits
 
 - [FastMCP](https://github.com/jlowin/fastmcp) — MCP server framework
-- [GitHub REST API](https://docs.github.com/en/rest) and [GraphQL API](https://docs.github.com/en/graphql)
-- [LangChain](https://python.langchain.com/) — LCEL RAG chain
-- [ChromaDB](https://www.trychroma.com/) — vector store
-- [Groq](https://groq.com/) — LLM inference (free tier available)
-- [uv](https://github.com/astral-sh/uv) — fast Python package manager
+- [FastAPI](https://fastapi.tiangolo.com/) — BFF framework
+- [Firebase Admin SDK](https://firebase.google.com/docs/admin/setup) — ID token verification
+- [python-jose](https://github.com/mpdavis/python-jose) — JWT
+- [cryptography](https://cryptography.io/) — Fernet token encryption
+- [slowapi](https://github.com/laurentS/slowapi) — rate limiting
+- [Alembic](https://alembic.sqlalchemy.org/) — DB migrations
+- [LangChain](https://python.langchain.com/) + [Groq](https://groq.com/) — RAG pipeline
+- [uv](https://github.com/astral-sh/uv) — Python package manager
