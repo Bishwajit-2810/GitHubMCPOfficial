@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../models/api_error.dart';
 import '../../providers/providers.dart';
 import '../../services/api_service.dart';
+import '../../widgets/form_widgets.dart';
 
 class CreatePRScreen extends StatefulWidget {
   const CreatePRScreen({super.key});
@@ -47,7 +49,7 @@ class _CreatePRScreenState extends State<CreatePRScreen> {
         owner: ctx.selectedOwner,
         repo: ctx.selectedRepo,
       );
-      setState(() { _result = result; _isLoading = false; });
+      if (mounted) setState(() { _result = result; _isLoading = false; });
     } on ApiError catch (e) {
       setState(() { _error = e.message; _isLoading = false; });
     } catch (e) {
@@ -55,12 +57,30 @@ class _CreatePRScreenState extends State<CreatePRScreen> {
     }
   }
 
+  void _reset() => setState(() { _result = null; _error = null; _titleCtrl.clear(); _bodyCtrl.clear(); _headCtrl.clear(); _baseCtrl.clear(); _draft = false; });
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Pull Request')),
+      backgroundColor: AppTheme.bg,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: AppTheme.repoGradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.merge_rounded, size: 16, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            const Text('Create Pull Request'),
+          ],
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: _result != null ? _buildSuccess() : _buildForm(),
       ),
     );
@@ -68,26 +88,19 @@ class _CreatePRScreenState extends State<CreatePRScreen> {
 
   Widget _buildSuccess() {
     final r = _result!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Icon(Icons.check_circle_outline, size: 56, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 16),
-        Text('PR #${r['number']} created!', textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        Text(r['title'] as String, textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 4),
-        Text('${r['head']} → ${r['base']}', textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 24),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.arrow_back),
-          label: const Text('Back'),
-          onPressed: () => context.pop(),
-        ),
+    return FormSuccessCard(
+      title: 'PR #${r['number']} created!',
+      subtitle: r['title'] as String?,
+      details: [
+        SuccessDetailRow(icon: Icons.call_merge_rounded, label: 'Head', value: r['head'] as String, valueColor: AppTheme.accentLight),
+        SuccessDetailRow(icon: Icons.merge_type_rounded, label: 'Base', value: r['base'] as String),
+        if (r['draft'] == true)
+          const SuccessDetailRow(icon: Icons.drafts_rounded, label: 'Status', value: 'Draft PR', valueColor: AppTheme.textSecondary),
       ],
+      onBack: () => context.pop(),
+      onCreateAnother: _reset,
+      createAnotherLabel: 'New PR',
+      gradientColors: AppTheme.repoGradient,
     );
   }
 
@@ -97,75 +110,104 @@ class _CreatePRScreenState extends State<CreatePRScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_error != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Theme.of(context).colorScheme.error),
-              ),
-              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            ),
-          TextFormField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Title *',
-              prefixIcon: Icon(Icons.title),
-            ),
-            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-          ),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-              child: TextFormField(
-                controller: _headCtrl,
+          if (_error != null) ...[
+            FormErrorBanner(message: _error!),
+            const SizedBox(height: 12),
+          ],
+          FormSectionCard(
+            title: 'Pull request',
+            children: [
+              TextFormField(
+                controller: _titleCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Head branch *',
-                  prefixIcon: Icon(Icons.call_merge),
-                  hintText: 'feature/my-feature',
+                  labelText: 'Title *',
+                  prefixIcon: Icon(Icons.title_rounded, size: 18),
+                  hintText: 'Fix: resolve null pointer in auth handler',
                 ),
                 validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _baseCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Base branch',
-                  prefixIcon: Icon(Icons.merge_type),
-                  hintText: 'main',
-                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _headCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Head branch *',
+                        prefixIcon: Icon(Icons.call_merge_rounded, size: 18),
+                        hintText: 'feature/fix',
+                      ),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.arrow_forward_rounded, size: 18, color: AppTheme.textMuted),
+                  ),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _baseCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Base branch',
+                        prefixIcon: Icon(Icons.merge_type_rounded, size: 18),
+                        hintText: 'main',
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ]),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _bodyCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Description',
-              prefixIcon: Icon(Icons.notes),
-              alignLabelWithHint: true,
-            ),
-            maxLines: 5,
+            ],
           ),
           const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Draft PR'),
-            subtitle: const Text('Mark as work in progress'),
-            value: _draft,
-            onChanged: (v) => setState(() => _draft = v),
+          FormSectionCard(
+            title: 'Description',
+            children: [
+              TextFormField(
+                controller: _bodyCtrl,
+                decoration: const InputDecoration(
+                  hintText: 'Describe your changes…',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                maxLines: 6,
+                minLines: 3,
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _isLoading ? null : _submit,
-            icon: _isLoading
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.merge),
-            label: const Text('Create Pull Request'),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: SwitchListTile(
+              title: const Text('Draft pull request',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              subtitle: const Text('Mark as work in progress',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+              secondary: Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceHigh,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.drafts_rounded, size: 16, color: AppTheme.textSecondary),
+              ),
+              value: _draft,
+              onChanged: (v) => setState(() => _draft = v),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            ),
+          ),
+          const SizedBox(height: 20),
+          GradientButton(
+            label: 'Open Pull Request',
+            icon: Icons.merge_rounded,
+            isLoading: _isLoading,
+            onPressed: _submit,
+            colors: AppTheme.repoGradient,
           ),
         ],
       ),

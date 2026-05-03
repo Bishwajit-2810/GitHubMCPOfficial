@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
+import '../config/theme.dart';
 
 class AppLoading extends StatelessWidget {
   final String? message;
@@ -13,15 +15,26 @@ class AppLoading extends StatelessWidget {
         children: [
           Lottie.asset(
             'assets/lottie/loading.json',
-            width: 100,
-            height: 100,
+            width: 80,
+            height: 80,
             fit: BoxFit.contain,
-            errorBuilder: (_, _, _) =>
-                const CircularProgressIndicator(),
+            errorBuilder: (ctx, err, st) => const SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppTheme.accent,
+              ),
+            ),
           ),
           if (message != null) ...[
-            const SizedBox(height: 12),
-            Text(message!, style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 16),
+            Text(
+              message!,
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+                .animate()
+                .fadeIn(delay: 200.ms),
           ],
         ],
       ),

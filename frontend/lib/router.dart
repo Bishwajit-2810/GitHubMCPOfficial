@@ -5,10 +5,16 @@ import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/tasks/task_list_screen.dart';
 import 'screens/tasks/create_task_screen.dart';
+import 'screens/tasks/assign_task_screen.dart';
+import 'screens/tasks/update_task_status_screen.dart';
 import 'screens/rag/ask_codebase_screen.dart';
+import 'screens/rag/explore_codebase_screen.dart';
 import 'screens/repo/files_screen.dart';
 import 'screens/repo/create_branch_screen.dart';
 import 'screens/repo/create_pr_screen.dart';
+import 'screens/repo/create_file_screen.dart';
+import 'screens/project/create_project_field_screen.dart';
+import 'screens/project/set_task_fields_screen.dart';
 import 'screens/settings/repo_selector_screen.dart';
 
 class RouterNotifier extends ChangeNotifier {
@@ -78,6 +84,30 @@ GoRouter buildRouter(AuthNotifier auth) {
       GoRoute(
         path: '/settings',
         builder: (context, _) => const RepoSelectorScreen(),
+      ),
+      GoRoute(
+        path: '/files/create',
+        builder: (context, _) => const CreateFileScreen(),
+      ),
+      GoRoute(
+        path: '/tasks/assign',
+        builder: (context, _) => const AssignTaskScreen(),
+      ),
+      GoRoute(
+        path: '/tasks/status',
+        builder: (context, _) => const UpdateTaskStatusScreen(),
+      ),
+      GoRoute(
+        path: '/explore',
+        builder: (context, _) => const ExploreCodebaseScreen(),
+      ),
+      GoRoute(
+        path: '/project/field/create',
+        builder: (context, _) => const CreateProjectFieldScreen(),
+      ),
+      GoRoute(
+        path: '/project/fields/set',
+        builder: (context, _) => const SetTaskFieldsScreen(),
       ),
     ],
   );

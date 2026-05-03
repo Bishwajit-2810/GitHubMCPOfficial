@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../providers/providers.dart';
+import '../../widgets/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,112 +31,172 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthNotifier>().state;
+    final p = Responsive.pagePadding(context);
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 32),
-              const Icon(Icons.hub_rounded, size: 56, color: Color(0xFF238636)),
-              const SizedBox(height: 16),
-              Text(
-                'GitHub MCP',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontSize: 26,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: p, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Logo + animation
+                  _buildHero(context),
+                  const SizedBox(height: 40),
+
+                  // Error banner
+                  if (auth.error != null)
+                    _ErrorBanner(message: auth.error!),
+
+                  // Google sign-in
+                  _SocialButton(
+                    icon: Icons.g_mobiledata_rounded,
+                    label: 'Continue with Google',
+                    onPressed: auth.isLoading
+                        ? null
+                        : () => context.read<AuthNotifier>().signInWithGoogle(),
+                  )
+                      .animate()
+                      .fadeIn(delay: 350.ms, duration: 300.ms)
+                      .slideY(begin: 0.3),
+                  const SizedBox(height: 20),
+
+                  // Divider
+                  Row(children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Text('or',
+                          style: Theme.of(context).textTheme.bodySmall),
                     ),
+                    const Expanded(child: Divider()),
+                  ])
+                      .animate()
+                      .fadeIn(delay: 400.ms),
+                  const SizedBox(height: 20),
+
+                  // Email form
+                  if (!_showEmail)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.email_outlined, size: 18),
+                      label: const Text('Continue with Email'),
+                      onPressed: () => setState(() => _showEmail = true),
+                    )
+                        .animate()
+                        .fadeIn(delay: 450.ms, duration: 300.ms)
+                        .slideY(begin: 0.3)
+                  else
+                    _EmailForm(
+                      formKey: _formKey,
+                      emailCtrl: _emailCtrl,
+                      passCtrl: _passCtrl,
+                      obscurePass: _obscurePass,
+                      isSignUp: _isSignUp,
+                      isLoading: auth.isLoading,
+                      onToggleObscure: () =>
+                          setState(() => _obscurePass = !_obscurePass),
+                      onToggleSignUp: () =>
+                          setState(() => _isSignUp = !_isSignUp),
+                      onSubmit: () {
+                        if (!_formKey.currentState!.validate()) return;
+                        final notifier = context.read<AuthNotifier>();
+                        if (_isSignUp) {
+                          notifier.createEmailAccount(
+                              _emailCtrl.text.trim(), _passCtrl.text);
+                        } else {
+                          notifier.signInWithEmail(
+                              _emailCtrl.text.trim(), _passCtrl.text);
+                        }
+                      },
+                    ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.2),
+
+                  if (auth.isLoading) ...[
+                    const SizedBox(height: 24),
+                    const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: AppTheme.accent),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Sign in to continue',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 40),
-
-              if (auth.error != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: Theme.of(context).colorScheme.error),
-                  ),
-                  child: Text(
-                    auth.error!,
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontSize: 13),
-                  ),
-                ),
-
-              _SocialButton(
-                icon: Icons.g_mobiledata_rounded,
-                label: 'Continue with Google',
-                onPressed: auth.isLoading
-                    ? null
-                    : () => context.read<AuthNotifier>().signInWithGoogle(),
-              ),
-              const SizedBox(height: 20),
-
-              Row(children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('or',
-                      style: Theme.of(context).textTheme.bodySmall),
-                ),
-                const Expanded(child: Divider()),
-              ]),
-              const SizedBox(height: 20),
-
-              if (!_showEmail)
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.email_outlined),
-                  label: const Text('Continue with Email'),
-                  onPressed: () => setState(() => _showEmail = true),
-                )
-              else
-                _EmailForm(
-                  formKey: _formKey,
-                  emailCtrl: _emailCtrl,
-                  passCtrl: _passCtrl,
-                  obscurePass: _obscurePass,
-                  isSignUp: _isSignUp,
-                  isLoading: auth.isLoading,
-                  onToggleObscure: () =>
-                      setState(() => _obscurePass = !_obscurePass),
-                  onToggleSignUp: () =>
-                      setState(() => _isSignUp = !_isSignUp),
-                  onSubmit: () {
-                    if (!_formKey.currentState!.validate()) return;
-                    final notifier = context.read<AuthNotifier>();
-                    if (_isSignUp) {
-                      notifier.createEmailAccount(
-                          _emailCtrl.text.trim(), _passCtrl.text);
-                    } else {
-                      notifier.signInWithEmail(
-                          _emailCtrl.text.trim(), _passCtrl.text);
-                    }
-                  },
-                ),
-
-              if (auth.isLoading) ...[
-                const SizedBox(height: 24),
-                const Center(child: CircularProgressIndicator()),
-              ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildHero(BuildContext context) {
+    return Column(
+      children: [
+        // Lottie loading animation used as hero visual
+        _LottieHero().animate().fadeIn(duration: 600.ms),
+        const SizedBox(height: 20),
+        Text(
+          'GitHub MCP',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+              ),
+        )
+            .animate()
+            .fadeIn(delay: 150.ms, duration: 400.ms)
+            .slideY(begin: 0.2),
+        const SizedBox(height: 6),
+        Text(
+          'Manage repos, projects and codebases with AI',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall,
+        )
+            .animate()
+            .fadeIn(delay: 220.ms, duration: 400.ms),
+      ],
+    );
+  }
 }
+
+// ── Error banner ──────────────────────────────────────────────────────────────
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.error.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline,
+              color: AppTheme.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: AppTheme.error, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 250.ms).slideY(begin: -0.2);
+  }
+}
+
+// ── Social button ─────────────────────────────────────────────────────────────
 
 class _SocialButton extends StatelessWidget {
   final IconData icon;
@@ -147,13 +211,27 @@ class _SocialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      icon: Icon(icon, size: 22),
-      label: Text(label),
+    return OutlinedButton(
       onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        side: BorderSide(
+          color: onPressed == null ? AppTheme.textMuted : AppTheme.border,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 22),
+          const SizedBox(width: 10),
+          Text(label),
+        ],
+      ),
     );
   }
 }
+
+// ── Email form ────────────────────────────────────────────────────────────────
 
 class _EmailForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -189,7 +267,7 @@ class _EmailForm extends StatelessWidget {
             controller: emailCtrl,
             decoration: const InputDecoration(
               labelText: 'Email',
-              prefixIcon: Icon(Icons.email_outlined),
+              prefixIcon: Icon(Icons.email_outlined, size: 18),
             ),
             keyboardType: TextInputType.emailAddress,
             validator: (v) =>
@@ -200,10 +278,12 @@ class _EmailForm extends StatelessWidget {
             controller: passCtrl,
             decoration: InputDecoration(
               labelText: 'Password',
-              prefixIcon: const Icon(Icons.lock_outline),
+              prefixIcon: const Icon(Icons.lock_outline, size: 18),
               suffixIcon: IconButton(
-                icon: Icon(
-                    obscurePass ? Icons.visibility : Icons.visibility_off),
+                icon: Icon(obscurePass
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                    size: 18),
                 onPressed: onToggleObscure,
               ),
             ),
@@ -226,6 +306,35 @@ class _EmailForm extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Lottie hero ───────────────────────────────────────────────────────────────
+
+class _LottieHero extends StatelessWidget {
+  const _LottieHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Lottie.asset(
+      'assets/lottie/loading.json',
+      width: 80,
+      height: 80,
+      fit: BoxFit.contain,
+      errorBuilder: (ctx, err, st) => Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: AppTheme.greenGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.hub_rounded, size: 32, color: Colors.white),
       ),
     );
   }

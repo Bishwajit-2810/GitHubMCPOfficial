@@ -174,6 +174,104 @@ class ApiService {
     );
   }
 
+  /// POST /tools/create-file
+  Future<Map<String, dynamic>> createFile({
+    required String path,
+    required String content,
+    required String message,
+    String? branch,
+    String? owner,
+    String? repo,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/create-file', data: {
+        'path': path,
+        'content': content,
+        'message': message,
+        if (branch != null) 'branch': branch,
+        if (owner != null) 'owner': owner,
+        if (repo != null) 'repo': repo,
+      }),
+    );
+  }
+
+  /// POST /tools/assign-task
+  Future<Map<String, dynamic>> assignTask({
+    required int issueNumber,
+    required List<String> assignees,
+    List<String>? labels,
+    String? owner,
+    String? repo,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/assign-task', data: {
+        'issue_number': issueNumber,
+        'assignees': assignees,
+        if (labels != null) 'labels': labels,
+        if (owner != null) 'owner': owner,
+        if (repo != null) 'repo': repo,
+      }),
+    );
+  }
+
+  /// POST /tools/update-task-status
+  Future<Map<String, dynamic>> updateTaskStatus({
+    required String itemId,
+    required String status,
+    int? projectNumber,
+    String? owner,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/update-task-status', data: {
+        'item_id': itemId,
+        'status': status,
+        if (projectNumber != null) 'project_number': projectNumber,
+        if (owner != null) 'owner': owner,
+      }),
+    );
+  }
+
+  /// POST /tools/explore-codebase
+  Future<Map<String, dynamic>> exploreCodebase({required String query}) async {
+    return _call(
+      () => _dio.post('/tools/explore-codebase', data: {'query': query}),
+    );
+  }
+
+  /// POST /tools/create-project-field
+  Future<Map<String, dynamic>> createProjectField({
+    required String fieldName,
+    required String fieldType,
+    int? projectNumber,
+    String? owner,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/create-project-field', data: {
+        'field_name': fieldName,
+        'field_type': fieldType,
+        if (projectNumber != null) 'project_number': projectNumber,
+        if (owner != null) 'owner': owner,
+      }),
+    );
+  }
+
+  /// POST /tools/set-task-fields
+  Future<Map<String, dynamic>> setTaskFields({
+    required String itemId,
+    required Map<String, dynamic> fields,
+    int? projectNumber,
+    String? owner,
+  }) async {
+    return _call(
+      () => _dio.post('/tools/set-task-fields', data: {
+        'item_id': itemId,
+        'fields': fields,
+        if (projectNumber != null) 'project_number': projectNumber,
+        if (owner != null) 'owner': owner,
+      }),
+    );
+  }
+
   // ── Internal ───────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> _call(
